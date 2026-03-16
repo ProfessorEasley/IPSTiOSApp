@@ -1,0 +1,9 @@
+# app_identifier("[[APP_IDENTIFIER]]") # The bundle identifier of your app
+# apple_id("[[APPLE_ID]]") # Your Apple Developer Portal username
+
+
+# For more information about the Appfile, see:
+#     https://docs.fastlane.tools/advanced/#appfile
+app_identifier("com.easleydunnproductions.IPSTColorStyle")
+apple_id("utkarshshah1995@gmail.com")
+team_id("7R6KH5T4SX")
