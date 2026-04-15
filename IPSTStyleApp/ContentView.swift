@@ -214,7 +214,14 @@ struct ContentView: View {
                 }
                 
                 // Camera Button
-                Button(action: { showCamera = true }) {
+                Button(action: {
+                    guard CameraPicker.isAvailable else {
+                        errorMessage = "Camera is not available in the simulator. Use Library instead."
+                        showError = true
+                        return
+                    }
+                    showCamera = true
+                }) {
                     HStack(spacing: 10) {
                         Image(systemName: "camera.fill")
                             .font(.system(size: 18, weight: .semibold))

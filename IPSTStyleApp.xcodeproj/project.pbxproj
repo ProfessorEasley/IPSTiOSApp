@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		088F8A762F89A3E600D1F743 /* cameraPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 088F8A752F89A3E600D1F743 /* cameraPicker.swift */; };
 		DD4ABB702EE2A15C00C04807 /* IPSTStyleAppApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD4ABB6F2EE2A15C00C04807 /* IPSTStyleAppApp.swift */; };
 		DD4ABB722EE2A15C00C04807 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD4ABB712EE2A15C00C04807 /* ContentView.swift */; };
 		DD4ABB742EE2A16000C04807 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = DD4ABB732EE2A16000C04807 /* Assets.xcassets */; };
@@ -37,6 +38,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		088F8A752F89A3E600D1F743 /* cameraPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = cameraPicker.swift; sourceTree = "<group>"; };
 		DD4ABB6C2EE2A15C00C04807 /* IPSTStyleApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = IPSTStyleApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		DD4ABB6F2EE2A15C00C04807 /* IPSTStyleAppApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPSTStyleAppApp.swift; sourceTree = "<group>"; };
 		DD4ABB712EE2A15C00C04807 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -109,6 +111,7 @@
 				DD4ABB9F2EE2A4DC00C04807 /* StyleTransferService.swift */,
 				DD4ABB732EE2A16000C04807 /* Assets.xcassets */,
 				DD4ABB752EE2A16000C04807 /* Preview Content */,
+				088F8A752F89A3E600D1F743 /* cameraPicker.swift */,
 			);
 			path = IPSTStyleApp;
 			sourceTree = "<group>";
@@ -272,6 +275,7 @@
 				DD4ABB722EE2A15C00C04807 /* ContentView.swift in Sources */,
 				DD4ABB9B2EE2A3DC00C04807 /* ImagePicker.swift in Sources */,
 				DD4ABB9E2EE2A4DC00C04807 /* StyleTransferService.swift in Sources */,
+				088F8A762F89A3E600D1F743 /* cameraPicker.swift in Sources */,
 				DD4ABB702EE2A15C00C04807 /* IPSTStyleAppApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

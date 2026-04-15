@@ -4,5 +4,13 @@
 <dict>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>CFBundleIdentifier</key>
+	<string></string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app needs access to your photo library.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>This app needs camera access to capture photos.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>This app saves stylized images to your gallery.</string>
 </dict>
 </plist>

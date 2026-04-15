@@ -14,7 +14,6 @@ import CoreImage
 class StyleTransferService: ObservableObject {
     
     // MARK: - Properties
-    
     private var model: ipst_style?
     @Published var isModelLoaded: Bool = false
     
@@ -22,7 +21,6 @@ class StyleTransferService: ObservableObject {
     private let modelInputSize = CGSize(width: 480, height: 480)
     
     // MARK: - Initialization
-    
     init() {
         loadModel()
     }
@@ -31,7 +29,8 @@ class StyleTransferService: ObservableObject {
     private func loadModel() {
         do {
             let config = MLModelConfiguration()
-            config.computeUnits = .all // Use CPU, GPU, and Neural Engine
+            config.computeUnits = .all
+            
             model = try ipst_style(configuration: config)
             isModelLoaded = true
             print("✅ StyleTransferService: Model loaded successfully")
@@ -42,29 +41,22 @@ class StyleTransferService: ObservableObject {
     }
     
     // MARK: - Public Methods
-    
     /// Apply style transfer to the given image
-    /// - Parameter image: The input UIImage to stylize
-    /// - Returns: The stylized UIImage
-    /// - Throws: StyleTransferError if processing fails
     func applyStyle(to image: UIImage) async throws -> UIImage {
         guard let model = model else {
             throw StyleTransferError.modelNotLoaded
         }
         
-        // Store original size to resize back later
         let originalSize = image.size
         
-        // Step 1: Preprocess - Resize and convert to MLMultiArray
         guard let resizedImage = resizeImage(image, to: modelInputSize),
-              let inputArray = createMLMultiArray(from: resizedImage) else {
+              let inputArray = createNormalizedMLMultiArray(from: resizedImage) else {
             throw StyleTransferError.preprocessingFailed
         }
         
-        // Step 2: Run inference
         let outputFeatures: MLFeatureProvider
+        
         do {
-            // Create input feature provider with the MLMultiArray
             let inputFeature = try MLDictionaryFeatureProvider(dictionary: [
                 "input": MLFeatureValue(multiArray: inputArray)
             ])
@@ -76,52 +68,47 @@ class StyleTransferService: ObservableObject {
             throw StyleTransferError.inferenceFailed(error.localizedDescription)
         }
         
-        // Get the output MLMultiArray
         guard let outputValue = outputFeatures.featureValue(for: "var_21"),
-              let outputMultiArray = outputValue.multiArrayValue else {
+              let deltaArray = outputValue.multiArrayValue else {
             throw StyleTransferError.postprocessingFailed
         }
         
-        // Step 3: Postprocess - Convert MLMultiArray output to UIImage
-        guard let outputImage = createImage(from: outputMultiArray, size: modelInputSize) else {
+        guard let stylizedImage = createStyledImage(
+            from: inputArray,
+            delta: deltaArray,
+            size: modelInputSize
+        ) else {
             throw StyleTransferError.postprocessingFailed
         }
         
-        // Step 4: Resize back to original size (optional, for better quality display)
-        guard let finalImage = resizeImage(outputImage, to: originalSize) else {
-            return outputImage
+        guard let finalImage = resizeImage(stylizedImage, to: originalSize) else {
+            return stylizedImage
         }
         
         return finalImage
     }
     
-    // MARK: - Private Methods - Preprocessing
-    
-    /// Resize image to target size using letterboxing (maintains aspect ratio)
+    // MARK: - Preprocessing
     private func resizeImage(_ image: UIImage, to targetSize: CGSize) -> UIImage? {
         let format = UIGraphicsImageRendererFormat()
-        format.scale = 1.0 // Use 1:1 pixel mapping
+        format.scale = 1.0
         
         let renderer = UIGraphicsImageRenderer(size: targetSize, format: format)
         
         return renderer.image { context in
-            // Fill with black background (letterboxing)
             UIColor.black.setFill()
             context.fill(CGRect(origin: .zero, size: targetSize))
             
-            // Calculate aspect-fit rect
             let aspectRatio = image.size.width / image.size.height
             let targetRatio = targetSize.width / targetSize.height
             
             var drawRect: CGRect
             
             if aspectRatio > targetRatio {
-                // Image is wider - fit to width
                 let height = targetSize.width / aspectRatio
                 let y = (targetSize.height - height) / 2
                 drawRect = CGRect(x: 0, y: y, width: targetSize.width, height: height)
             } else {
-                // Image is taller - fit to height
                 let width = targetSize.height * aspectRatio
                 let x = (targetSize.width - width) / 2
                 drawRect = CGRect(x: x, y: 0, width: width, height: targetSize.height)
@@ -131,139 +118,84 @@ class StyleTransferService: ObservableObject {
         }
     }
     
-    /// Create an MLMultiArray from UIImage for CoreML input
-    /// The model expects input in NCHW format: [1, 3, 480, 480] with Float32 values (0-255 range)
-    private func createMLMultiArray(from image: UIImage) -> MLMultiArray? {
+    private func createNormalizedMLMultiArray(from image: UIImage) -> MLMultiArray? {
         guard let cgImage = image.cgImage else { return nil }
         
         let width = cgImage.width
         let height = cgImage.height
         
-        // Create MLMultiArray with shape [1, 3, height, width]
-        guard let multiArray = try? MLMultiArray(shape: [1, 3, NSNumber(value: height), NSNumber(value: width)], dataType: .float32) else {
-            print("❌ Failed to create MLMultiArray")
+        guard let multiArray = try? MLMultiArray(
+            shape: [1, 3, NSNumber(value: height), NSNumber(value: width)],
+            dataType: .float32
+        ) else {
             return nil
         }
         
-        // Get pixel data from CGImage
         guard let pixelData = cgImage.dataProvider?.data,
               let data = CFDataGetBytePtr(pixelData) else {
-            print("❌ Failed to get pixel data")
             return nil
         }
         
         let bytesPerPixel = cgImage.bitsPerPixel / 8
         let bytesPerRow = cgImage.bytesPerRow
         
-        // Get pointer to MLMultiArray data
         let pointer = multiArray.dataPointer.bindMemory(to: Float32.self, capacity: multiArray.count)
-        
-        // Calculate stride for channel-first format
         let channelStride = height * width
         
-        // Fill the MLMultiArray in NCHW format
+        let mean: [Float32] = [0.485, 0.456, 0.406]
+        let std: [Float32] = [0.229, 0.224, 0.225]
+        
         for y in 0..<height {
             for x in 0..<width {
                 let pixelIndex = y * bytesPerRow + x * bytesPerPixel
                 let arrayIndex = y * width + x
                 
-                // Extract RGB values (assuming RGBA or BGRA format)
-                let r: Float32
-                let g: Float32
-                let b: Float32
+                let r = Float32(data[pixelIndex + 2]) / 255.0
+                let g = Float32(data[pixelIndex + 1]) / 255.0
+                let b = Float32(data[pixelIndex]) / 255.0
                 
-                // Handle different pixel formats
-                if cgImage.bitmapInfo.contains(.byteOrder32Little) {
-                    // BGRA format (little endian)
-                    b = Float32(data[pixelIndex])
-                    g = Float32(data[pixelIndex + 1])
-                    r = Float32(data[pixelIndex + 2])
-                } else {
-                    // RGBA format (big endian)
-                    r = Float32(data[pixelIndex])
-                    g = Float32(data[pixelIndex + 1])
-                    b = Float32(data[pixelIndex + 2])
-                }
-                
-                // Store in channel-first format [1, C, H, W]
-                // Channel 0 (R)
-                pointer[0 * channelStride + arrayIndex] = r
-                // Channel 1 (G)
-                pointer[1 * channelStride + arrayIndex] = g
-                // Channel 2 (B)
-                pointer[2 * channelStride + arrayIndex] = b
+                pointer[0 * channelStride + arrayIndex] = (r - mean[0]) / std[0]
+                pointer[1 * channelStride + arrayIndex] = (g - mean[1]) / std[1]
+                pointer[2 * channelStride + arrayIndex] = (b - mean[2]) / std[2]
             }
         }
         
         return multiArray
     }
     
-    // MARK: - Private Methods - Postprocessing
-    
-    /// Create UIImage from model output MLMultiArray
-    /// The model output is expected to be in NCHW format: [1, 3, height, width]
-    private func createImage(from multiArray: MLMultiArray, size: CGSize) -> UIImage? {
-        let width = Int(size.width)
-        let height = Int(size.height)
+    private func createStyledImage(
+        from input: MLMultiArray,
+        delta: MLMultiArray,
+        size: CGSize
+    ) -> UIImage? {
+        let shape = input.shape.map { $0.intValue }
+        guard shape.count == 4 else { return nil }
         
-        // Verify the shape - expecting [1, 3, height, width] or [3, height, width]
-        let shape = multiArray.shape.map { $0.intValue }
+        let height = shape[2]
+        let width = shape[3]
+        let channelStride = height * width
         
-        let channels: Int
-        let heightIndex: Int
-        let widthIndex: Int
+        let inputPtr = input.dataPointer.bindMemory(to: Float32.self, capacity: input.count)
+        let deltaPtr = delta.dataPointer.bindMemory(to: Float32.self, capacity: delta.count)
         
-        if shape.count == 4 {
-            // [1, 3, H, W] format
-            channels = shape[1]
-            heightIndex = 2
-            widthIndex = 3
-        } else if shape.count == 3 {
-            // [3, H, W] format
-            channels = shape[0]
-            heightIndex = 1
-            widthIndex = 2
-        } else {
-            print("❌ Unexpected MLMultiArray shape: \(shape)")
-            return nil
-        }
+        let mean: [Float32] = [0.485, 0.456, 0.406]
+        let std: [Float32] = [0.229, 0.224, 0.225]
         
-        guard channels == 3 else {
-            print("❌ Expected 3 channels, got \(channels)")
-            return nil
-        }
+        var pixelData = [UInt8](repeating: 0, count: width * height * 4)
         
-        let outputHeight = shape[heightIndex]
-        let outputWidth = shape[widthIndex]
-        
-        // Create pixel data buffer (RGBA format)
-        var pixelData = [UInt8](repeating: 0, count: outputWidth * outputHeight * 4)
-        
-        // Get pointer to MLMultiArray data
-        let pointer = multiArray.dataPointer.bindMemory(to: Float32.self, capacity: multiArray.count)
-        
-        // Calculate strides for accessing the data
-        let channelStride = outputHeight * outputWidth
-        
-        for y in 0..<outputHeight {
-            for x in 0..<outputWidth {
-                let pixelIndex = y * outputWidth + x
+        for y in 0..<height {
+            for x in 0..<width {
+                let pixelIndex = y * width + x
                 let rgbaIndex = pixelIndex * 4
                 
-                // Extract RGB values (model output is typically in range 0-255 or 0-1)
-                var r = pointer[0 * channelStride + pixelIndex]
-                var g = pointer[1 * channelStride + pixelIndex]
-                var b = pointer[2 * channelStride + pixelIndex]
+                let rNorm = inputPtr[0 * channelStride + pixelIndex] + deltaPtr[0 * channelStride + pixelIndex]
+                let gNorm = inputPtr[1 * channelStride + pixelIndex] + deltaPtr[1 * channelStride + pixelIndex]
+                let bNorm = inputPtr[2 * channelStride + pixelIndex] + deltaPtr[2 * channelStride + pixelIndex]
                 
-                // Clamp values to 0-255 range
-                // If values are in 0-1 range, scale them up
-                if r <= 1.0 && g <= 1.0 && b <= 1.0 && r >= 0 && g >= 0 && b >= 0 {
-                    r *= 255.0
-                    g *= 255.0
-                    b *= 255.0
-                }
+                var r = (rNorm * std[0] + mean[0]) * 255.0
+                var g = (gNorm * std[1] + mean[1]) * 255.0
+                var b = (bNorm * std[2] + mean[2]) * 255.0
                 
-                // Clamp to valid range
                 r = max(0, min(255, r))
                 g = max(0, min(255, g))
                 b = max(0, min(255, b))
@@ -271,21 +203,20 @@ class StyleTransferService: ObservableObject {
                 pixelData[rgbaIndex] = UInt8(r)
                 pixelData[rgbaIndex + 1] = UInt8(g)
                 pixelData[rgbaIndex + 2] = UInt8(b)
-                pixelData[rgbaIndex + 3] = 255 // Alpha
+                pixelData[rgbaIndex + 3] = 255
             }
         }
         
-        // Create CGImage from pixel data
         let colorSpace = CGColorSpaceCreateDeviceRGB()
         let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue)
         
         guard let provider = CGDataProvider(data: Data(pixelData) as CFData),
               let cgImage = CGImage(
-                width: outputWidth,
-                height: outputHeight,
+                width: width,
+                height: height,
                 bitsPerComponent: 8,
                 bitsPerPixel: 32,
-                bytesPerRow: outputWidth * 4,
+                bytesPerRow: width * 4,
                 space: colorSpace,
                 bitmapInfo: bitmapInfo,
                 provider: provider,
@@ -321,4 +252,3 @@ enum StyleTransferError: LocalizedError {
         }
     }
 }
-
