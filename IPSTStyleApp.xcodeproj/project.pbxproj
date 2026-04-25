@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		080766072F9BFBA800AE3C0E /* ipst_style.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = 080766062F9BFBA800AE3C0E /* ipst_style.mlpackage */; };
 		088F8A762F89A3E600D1F743 /* cameraPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 088F8A752F89A3E600D1F743 /* cameraPicker.swift */; };
 		DD4ABB702EE2A15C00C04807 /* IPSTStyleAppApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD4ABB6F2EE2A15C00C04807 /* IPSTStyleAppApp.swift */; };
 		DD4ABB722EE2A15C00C04807 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD4ABB712EE2A15C00C04807 /* ContentView.swift */; };
@@ -15,7 +16,6 @@
 		DD4ABB812EE2A16100C04807 /* IPSTStyleAppTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD4ABB802EE2A16100C04807 /* IPSTStyleAppTests.swift */; };
 		DD4ABB8B2EE2A16100C04807 /* IPSTStyleAppUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD4ABB8A2EE2A16100C04807 /* IPSTStyleAppUITests.swift */; };
 		DD4ABB8D2EE2A16100C04807 /* IPSTStyleAppUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD4ABB8C2EE2A16100C04807 /* IPSTStyleAppUITestsLaunchTests.swift */; };
-		DD4ABB9A2EE2A2DB00C04807 /* ipst_style.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = DD4ABB992EE2A2DA00C04807 /* ipst_style.mlpackage */; };
 		DD4ABB9B2EE2A3DC00C04807 /* ImagePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD4ABB9C2EE2A3DC00C04807 /* ImagePicker.swift */; };
 		DD4ABB9E2EE2A4DC00C04807 /* StyleTransferService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD4ABB9F2EE2A4DC00C04807 /* StyleTransferService.swift */; };
 /* End PBXBuildFile section */
@@ -38,6 +38,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		080766062F9BFBA800AE3C0E /* ipst_style.mlpackage */ = {isa = PBXFileReference; lastKnownFileType = folder.mlpackage; path = ipst_style.mlpackage; sourceTree = "<group>"; };
 		088F8A752F89A3E600D1F743 /* cameraPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = cameraPicker.swift; sourceTree = "<group>"; };
 		DD4ABB6C2EE2A15C00C04807 /* IPSTStyleApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = IPSTStyleApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		DD4ABB6F2EE2A15C00C04807 /* IPSTStyleAppApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPSTStyleAppApp.swift; sourceTree = "<group>"; };
@@ -49,7 +50,6 @@
 		DD4ABB862EE2A16100C04807 /* IPSTStyleAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = IPSTStyleAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		DD4ABB8A2EE2A16100C04807 /* IPSTStyleAppUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPSTStyleAppUITests.swift; sourceTree = "<group>"; };
 		DD4ABB8C2EE2A16100C04807 /* IPSTStyleAppUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPSTStyleAppUITestsLaunchTests.swift; sourceTree = "<group>"; };
-		DD4ABB992EE2A2DA00C04807 /* ipst_style.mlpackage */ = {isa = PBXFileReference; lastKnownFileType = folder.mlpackage; path = ipst_style.mlpackage; sourceTree = "<group>"; };
 		DD4ABB9C2EE2A3DC00C04807 /* ImagePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImagePicker.swift; sourceTree = "<group>"; };
 		DD4ABB9D2EE2A3DC00C04807 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		DD4ABB9F2EE2A4DC00C04807 /* StyleTransferService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StyleTransferService.swift; sourceTree = "<group>"; };
@@ -103,8 +103,8 @@
 		DD4ABB6E2EE2A15C00C04807 /* IPSTStyleApp */ = {
 			isa = PBXGroup;
 			children = (
+				080766062F9BFBA800AE3C0E /* ipst_style.mlpackage */,
 				DD4ABB9D2EE2A3DC00C04807 /* Info.plist */,
-				DD4ABB992EE2A2DA00C04807 /* ipst_style.mlpackage */,
 				DD4ABB6F2EE2A15C00C04807 /* IPSTStyleAppApp.swift */,
 				DD4ABB712EE2A15C00C04807 /* ContentView.swift */,
 				DD4ABB9C2EE2A3DC00C04807 /* ImagePicker.swift */,
@@ -271,10 +271,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				DD4ABB9A2EE2A2DB00C04807 /* ipst_style.mlpackage in Sources */,
 				DD4ABB722EE2A15C00C04807 /* ContentView.swift in Sources */,
 				DD4ABB9B2EE2A3DC00C04807 /* ImagePicker.swift in Sources */,
 				DD4ABB9E2EE2A4DC00C04807 /* StyleTransferService.swift in Sources */,
+				080766072F9BFBA800AE3C0E /* ipst_style.mlpackage in Sources */,
 				088F8A762F89A3E600D1F743 /* cameraPicker.swift in Sources */,
 				DD4ABB702EE2A15C00C04807 /* IPSTStyleAppApp.swift in Sources */,
 			);
