@@ -6,11 +6,11 @@
 //
 
 import SwiftUI
+import UIKit
 import CoreML
 import Vision
 
 struct ContentView: View {
-    // MARK: - State
     @State private var selectedImage: UIImage?
     @State private var stylizedImage: UIImage?
     @State private var showPhotoLibrary = false
@@ -22,34 +22,25 @@ struct ContentView: View {
     @State private var errorMessage: String?
     @State private var showError = false
     @State private var showSaveSuccess = false
-    
-    // MARK: - Services
+    @State private var showResultScreen = false
+
     @StateObject private var styleService = StyleTransferService()
-    
+
     var body: some View {
         NavigationView {
             ZStack {
-                // Background gradient
                 LinearGradient(
                     colors: [Color(hex: "1a1a2e"), Color(hex: "16213e")],
                     startPoint: .top,
                     endPoint: .bottom
                 )
                 .ignoresSafeArea()
-                
+
                 VStack(spacing: 24) {
-                    // Header
                     headerView
-                    
-                    // Image Display Area
                     imageDisplayArea
-                    
                     Spacer()
-                    
-                    // Action Buttons
                     actionButtons
-                    
-                    // Status indicator
                     statusIndicator
                 }
                 .padding()
@@ -64,10 +55,26 @@ struct ContentView: View {
             CameraPicker(selectedImage: $selectedImage)
                 .ignoresSafeArea()
         }
+        .fullScreenCover(isPresented: $showResultScreen) {
+            if let image = stylizedImage {
+                ResultFullScreenView(
+                    image: image,
+                    onSave: {
+                        saveToGallery()
+                        showResultScreen = false
+                    },
+                    onCancel: {
+                        showResultScreen = false
+                    }
+                )
+            } else {
+                Color.black.ignoresSafeArea()
+            }
+        }
         .onChange(of: selectedImage) { _ in
-            // Reset stylized image when new image is selected
             stylizedImage = nil
             showStylized = false
+            showResultScreen = false
         }
         .alert("Style Transfer Error", isPresented: $showError) {
             Button("OK", role: .cancel) { }
@@ -83,8 +90,7 @@ struct ContentView: View {
             verifyModel()
         }
     }
-    
-    // MARK: - Header View
+
     private var headerView: some View {
         VStack(spacing: 8) {
             HStack(spacing: 12) {
@@ -97,20 +103,19 @@ struct ContentView: View {
                             endPoint: .bottomTrailing
                         )
                     )
-                
+
                 Text("IPST Style")
                     .font(.system(size: 28, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
             }
-            
+
             Text("Instant Photorealistic Style Transfer")
                 .font(.system(size: 14, weight: .medium))
                 .foregroundColor(Color.white.opacity(0.6))
         }
         .padding(.top, 20)
     }
-    
-    // MARK: - Image Display Area
+
     private var imageDisplayArea: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 20)
@@ -119,16 +124,14 @@ struct ContentView: View {
                     RoundedRectangle(cornerRadius: 20)
                         .stroke(Color.white.opacity(0.1), lineWidth: 1)
                 )
-            
-            // Determine which image to display
+
             if let displayImage = showStylized ? stylizedImage : selectedImage {
                 Image(uiImage: displayImage)
                     .resizable()
                     .scaledToFit()
                     .clipShape(RoundedRectangle(cornerRadius: 16))
                     .padding(8)
-                
-                // Toggle button (only show if we have stylized result)
+
                 if stylizedImage != nil {
                     VStack {
                         HStack {
@@ -156,28 +159,26 @@ struct ContentView: View {
                     }
                 }
             } else if selectedImage == nil {
-                // Placeholder
                 VStack(spacing: 16) {
                     Image(systemName: "photo.on.rectangle.angled")
                         .font(.system(size: 50, weight: .light))
                         .foregroundColor(Color.white.opacity(0.3))
-                    
+
                     Text("Select or capture an image")
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(Color.white.opacity(0.4))
                 }
             }
-            
-            // Loading overlay
+
             if isProcessing {
                 RoundedRectangle(cornerRadius: 20)
                     .fill(Color.black.opacity(0.7))
-                
+
                 VStack(spacing: 16) {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                         .scaleEffect(1.5)
-                    
+
                     Text("Applying style transfer...")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.white)
@@ -187,12 +188,10 @@ struct ContentView: View {
         .frame(maxWidth: .infinity)
         .frame(height: UIScreen.main.bounds.height * 0.45)
     }
-    
-    // MARK: - Action Buttons
+
     private var actionButtons: some View {
         VStack(spacing: 12) {
             HStack(spacing: 16) {
-                // Photo Library Button
                 Button(action: { showPhotoLibrary = true }) {
                     HStack(spacing: 10) {
                         Image(systemName: "photo.stack")
@@ -212,8 +211,7 @@ struct ContentView: View {
                     )
                     .clipShape(RoundedRectangle(cornerRadius: 14))
                 }
-                
-                // Camera Button
+
                 Button(action: {
                     guard CameraPicker.isAvailable else {
                         errorMessage = "Camera is not available in the simulator. Use Library instead."
@@ -243,8 +241,7 @@ struct ContentView: View {
                 .disabled(!CameraPicker.isAvailable)
                 .opacity(CameraPicker.isAvailable ? 1.0 : 0.5)
             }
-            
-            // Apply Style Button (shows when image is selected)
+
             if selectedImage != nil {
                 Button(action: {
                     applyStyleTransfer()
@@ -252,7 +249,7 @@ struct ContentView: View {
                     HStack(spacing: 10) {
                         Image(systemName: "wand.and.rays")
                             .font(.system(size: 20, weight: .semibold))
-                        Text(stylizedImage != nil ? "Re-apply Style" : "Apply Style Transfer")
+                        Text(stylizedImage != nil ? "Re apply Style" : "Apply Style Transfer")
                             .font(.system(size: 17, weight: .bold))
                     }
                     .foregroundColor(.white)
@@ -273,8 +270,7 @@ struct ContentView: View {
                 .transition(.move(edge: .bottom).combined(with: .opacity))
                 .animation(.spring(response: 0.4, dampingFraction: 0.8), value: selectedImage != nil)
             }
-            
-            // Save to Gallery Button (shows when stylized image is available)
+
             if stylizedImage != nil {
                 Button(action: {
                     saveToGallery()
@@ -311,13 +307,12 @@ struct ContentView: View {
             }
         }
     }
-    
-    // MARK: - Style Transfer Action
+
     private func applyStyleTransfer() {
         guard let inputImage = selectedImage else { return }
-        
+
         isProcessing = true
-        
+
         Task {
             do {
                 let result = try await styleService.applyStyle(to: inputImage)
@@ -325,6 +320,7 @@ struct ContentView: View {
                     stylizedImage = result
                     showStylized = true
                     isProcessing = false
+                    showResultScreen = true
                 }
             } catch {
                 await MainActor.run {
@@ -335,14 +331,12 @@ struct ContentView: View {
             }
         }
     }
-    
-    // MARK: - Save to Gallery Action
+
     private func saveToGallery() {
         guard let imageToSave = stylizedImage else { return }
-        
+
         isSaving = true
-        
-        // Use ImageSaver helper class for callback handling
+
         let imageSaver = ImageSaver()
         imageSaver.onSuccess = {
             DispatchQueue.main.async {
@@ -359,37 +353,110 @@ struct ContentView: View {
         }
         imageSaver.saveImage(imageToSave)
     }
-    
-    // MARK: - Status Indicator
+
     private var statusIndicator: some View {
         HStack(spacing: 8) {
             Circle()
                 .fill(modelLoaded ? Color.green : Color.orange)
                 .frame(width: 8, height: 8)
-            
+
             Text(modelLoaded ? "Model Ready" : "Loading model...")
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(Color.white.opacity(0.5))
         }
         .padding(.bottom, 8)
     }
-    
-    // MARK: - Model Verification
+
     private func verifyModel() {
-        do {
-            let config = MLModelConfiguration()
-            config.computeUnits = .all
-            let _ = try ipst_style(configuration: config)
-            modelLoaded = true
+        modelLoaded = styleService.isModelLoaded
+        if modelLoaded {
             print("✅ Model loaded successfully")
-        } catch {
-            modelLoaded = false
-            print("❌ Error loading model: \(error)")
+        } else {
+            print("❌ Model is not ready")
         }
     }
 }
 
-// MARK: - Color Extension for Hex Support
+struct ResultFullScreenView: View {
+    let image: UIImage
+    let onSave: () -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+
+            VStack(spacing: 20) {
+                HStack {
+                    Button(action: onCancel) {
+                        Text("Cancel")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .background(Color.white.opacity(0.15))
+                            .clipShape(Capsule())
+                    }
+
+                    Spacer()
+
+                    Text("Preview")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(.white)
+
+                    Spacer()
+
+                    Color.clear
+                        .frame(width: 72, height: 36)
+                }
+                .padding(.horizontal)
+                .padding(.top, 8)
+
+                Spacer()
+
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .clipShape(RoundedRectangle(cornerRadius: 24))
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+
+                Spacer()
+
+                HStack(spacing: 12) {
+                    Button(action: onCancel) {
+                        Text("Cancel")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 54)
+                            .background(Color.white.opacity(0.12))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                    }
+
+                    Button(action: onSave) {
+                        Text("Save")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 54)
+                            .background(
+                                LinearGradient(
+                                    colors: [Color(hex: "11998e"), Color(hex: "38ef7d")],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 28)
+            }
+        }
+    }
+}
+
 extension Color {
     init(hex: String) {
         let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
@@ -397,11 +464,11 @@ extension Color {
         Scanner(string: hex).scanHexInt64(&int)
         let a, r, g, b: UInt64
         switch hex.count {
-        case 3: // RGB (12-bit)
+        case 3:
             (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
-        case 6: // RGB (24-bit)
+        case 6:
             (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
-        case 8: // ARGB (32-bit)
+        case 8:
             (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
         default:
             (a, r, g, b) = (255, 0, 0, 0)
@@ -416,16 +483,14 @@ extension Color {
     }
 }
 
-// MARK: - Image Saver Helper
-/// Helper class to handle UIImageWriteToSavedPhotosAlbum callback
 class ImageSaver: NSObject {
     var onSuccess: (() -> Void)?
     var onError: ((Error) -> Void)?
-    
+
     func saveImage(_ image: UIImage) {
         UIImageWriteToSavedPhotosAlbum(image, self, #selector(saveCompleted), nil)
     }
-    
+
     @objc func saveCompleted(_ image: UIImage, didFinishSavingWithError error: Error?, contextInfo: UnsafeRawPointer) {
         if let error = error {
             onError?(error)

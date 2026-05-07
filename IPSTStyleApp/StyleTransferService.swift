@@ -110,37 +110,34 @@ class StyleTransferService: ObservableObject {
               let inputArray = createNormalizedMLMultiArray(from: resizedImage) else {
             throw StyleTransferError.preprocessingFailed
         }
-        
-        // Debug: Input normalization stats
+
         let inputPtr = inputArray.dataPointer.bindMemory(to: Float32.self, capacity: inputArray.count)
         let inputValues = (0..<inputArray.count).map { inputPtr[$0] }
         let inputMin = inputValues.min() ?? 0
         let inputMax = inputValues.max() ?? 0
         let inputMean = Float(inputValues.reduce(0, +)) / Float(inputValues.count)
+
         print("✓ Input MLMultiArray shape: \(inputArray.shape)")
         print("  Normalized range: [\(String(format: "%.4f", inputMin)), \(String(format: "%.4f", inputMax))]")
         print("  Mean value: \(String(format: "%.4f", inputMean))")
-let output: ipst_styleOutput
-       
-do {
-    output = try await Task.detached(priority: .userInitiated) {
-        try model.prediction(input: inputArray)
-    }.value
-} catch {
-    throw StyleTransferError.inferenceFailed(error.localizedDescription)
-}
 
-let outputArray = output.var_22
+        let output: ipst_styleOutput
+        do {
+            output = try await Task.detached(priority: .userInitiated) {
+                try model.prediction(input: inputArray)
+            }.value
+        } catch {
+            throw StyleTransferError.inferenceFailed(error.localizedDescription)
+        }
 
-        
-        
+        let outputArray = output.var_22
 
-        // Debug: Output array stats (this is the DELTA from the model)
-        let ptr = outputArray.dataPointer.bindMemory(to: Float32.self, capacity: outputArray.count)
-        let outputValues = (0..<outputArray.count).map { ptr[$0] }
+        let outPtr = outputArray.dataPointer.bindMemory(to: Float32.self, capacity: outputArray.count)
+        let outputValues = (0..<outputArray.count).map { outPtr[$0] }
         let outputMin = outputValues.min() ?? 0
         let outputMax = outputValues.max() ?? 0
         let outputMean = Float(outputValues.reduce(0, +)) / Float(outputValues.count)
+
         print("✓ Delta/Output array shape: \(outputArray.shape)")
         print("  Delta range: [\(String(format: "%.4f", outputMin)), \(String(format: "%.4f", outputMax))]")
         print("  Mean delta: \(String(format: "%.4f", outputMean))")
@@ -153,11 +150,7 @@ let outputArray = output.var_22
             return applyColorCorrection(finalImage)
         }
 
-        return stylizedImage
-
-        print("\n✅ Returning stylized image at 480x480")
-        print("================================================\n")
-        return stylizedImage
+        return applyColorCorrection(stylizedImage)
     }
     func applyColorCorrection(_ image: UIImage) -> UIImage {
         guard let ciImage = CIImage(image: image) else { return image }
