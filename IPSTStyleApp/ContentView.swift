@@ -18,7 +18,6 @@ struct ContentView: View {
     @State private var modelLoaded = false
     @State private var isProcessing = false
     @State private var isSaving = false
-    @State private var showStylized = false
     @State private var errorMessage: String?
     @State private var showError = false
     @State private var showSaveSuccess = false
@@ -56,9 +55,10 @@ struct ContentView: View {
                 .ignoresSafeArea()
         }
         .fullScreenCover(isPresented: $showResultScreen) {
-            if let image = stylizedImage {
+            if let originalImage = selectedImage, let stylizedImage = stylizedImage {
                 ResultFullScreenView(
-                    image: image,
+                    originalImage: originalImage,
+                    stylizedImage: stylizedImage,
                     onSave: {
                         saveToGallery()
                         showResultScreen = false
@@ -73,7 +73,6 @@ struct ContentView: View {
         }
         .onChange(of: selectedImage) { _ in
             stylizedImage = nil
-            showStylized = false
             showResultScreen = false
         }
         .alert("Style Transfer Error", isPresented: $showError) {
@@ -125,39 +124,19 @@ struct ContentView: View {
                         .stroke(Color.white.opacity(0.1), lineWidth: 1)
                 )
 
-            if let displayImage = showStylized ? stylizedImage : selectedImage {
+            if let originalImage = selectedImage, let stylizedImage = stylizedImage {
+                BeforeAfterComparisonView(
+                    originalImage: originalImage,
+                    stylizedImage: stylizedImage,
+                    cornerRadius: 16
+                )
+                .padding(8)
+            } else if let displayImage = selectedImage {
                 Image(uiImage: displayImage)
                     .resizable()
                     .scaledToFit()
                     .clipShape(RoundedRectangle(cornerRadius: 16))
                     .padding(8)
-
-                if stylizedImage != nil {
-                    VStack {
-                        HStack {
-                            Spacer()
-                            Button(action: {
-                                withAnimation(.easeInOut(duration: 0.2)) {
-                                    showStylized.toggle()
-                                }
-                            }) {
-                                HStack(spacing: 6) {
-                                    Image(systemName: showStylized ? "photo" : "wand.and.stars")
-                                        .font(.system(size: 12, weight: .semibold))
-                                    Text(showStylized ? "Original" : "Stylized")
-                                        .font(.system(size: 12, weight: .semibold))
-                                }
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(Color.black.opacity(0.6))
-                                .clipShape(Capsule())
-                            }
-                            .padding(16)
-                        }
-                        Spacer()
-                    }
-                }
             } else if selectedImage == nil {
                 VStack(spacing: 16) {
                     Image(systemName: "photo.on.rectangle.angled")
@@ -318,7 +297,6 @@ struct ContentView: View {
                 let result = try await styleService.applyStyle(to: inputImage)
                 await MainActor.run {
                     stylizedImage = result
-                    showStylized = true
                     isProcessing = false
                     showResultScreen = true
                 }
@@ -378,7 +356,8 @@ struct ContentView: View {
 }
 
 struct ResultFullScreenView: View {
-    let image: UIImage
+    let originalImage: UIImage
+    let stylizedImage: UIImage
     let onSave: () -> Void
     let onCancel: () -> Void
 
@@ -414,10 +393,11 @@ struct ResultFullScreenView: View {
 
                 Spacer()
 
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    .clipShape(RoundedRectangle(cornerRadius: 24))
+                BeforeAfterComparisonView(
+                    originalImage: originalImage,
+                    stylizedImage: stylizedImage,
+                    cornerRadius: 24
+                )
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
 
@@ -454,6 +434,105 @@ struct ResultFullScreenView: View {
                 .padding(.bottom, 28)
             }
         }
+    }
+}
+
+struct BeforeAfterComparisonView: View {
+    let originalImage: UIImage
+    let stylizedImage: UIImage
+    let cornerRadius: CGFloat
+
+    @State private var dividerPosition: CGFloat = 0.5
+
+    var body: some View {
+        GeometryReader { geometry in
+            let fittedSize = fittedImageSize(
+                imageSize: originalImage.size,
+                availableSize: geometry.size
+            )
+
+            ZStack {
+                if fittedSize.width > 0 && fittedSize.height > 0 {
+                    comparisonImage(size: fittedSize)
+                }
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height)
+        }
+    }
+
+    private func comparisonImage(size: CGSize) -> some View {
+        let dividerX = size.width * dividerPosition
+
+        return ZStack(alignment: .leading) {
+            Image(uiImage: stylizedImage)
+                .resizable()
+                .scaledToFill()
+                .frame(width: size.width, height: size.height)
+                .clipped()
+
+            Image(uiImage: originalImage)
+                .resizable()
+                .scaledToFill()
+                .frame(width: size.width, height: size.height)
+                .clipped()
+                .mask(alignment: .leading) {
+                    Rectangle()
+                        .frame(width: dividerX, height: size.height)
+                }
+
+            divider(height: size.height)
+                .position(x: dividerX, y: size.height / 2)
+        }
+        .frame(width: size.width, height: size.height)
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { value in
+                    dividerPosition = min(max(value.location.x / size.width, 0), 1)
+                }
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func divider(height: CGFloat) -> some View {
+        ZStack {
+            Rectangle()
+                .fill(Color.white)
+                .frame(width: 3, height: height)
+                .shadow(color: .black.opacity(0.35), radius: 6, x: 0, y: 0)
+
+            Circle()
+                .fill(Color.white)
+                .frame(width: 42, height: 42)
+                .shadow(color: .black.opacity(0.35), radius: 8, x: 0, y: 3)
+                .overlay(
+                    HStack(spacing: 2) {
+                        Image(systemName: "chevron.left")
+                        Image(systemName: "chevron.right")
+                    }
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(Color(hex: "1a1a2e"))
+                )
+        }
+        .accessibilityLabel("Before and after divider")
+        .accessibilityHint("Drag left or right to compare the original and stylized image")
+    }
+
+    private func fittedImageSize(imageSize: CGSize, availableSize: CGSize) -> CGSize {
+        guard imageSize.width > 0,
+              imageSize.height > 0,
+              availableSize.width > 0,
+              availableSize.height > 0 else {
+            return .zero
+        }
+
+        let scale = min(
+            availableSize.width / imageSize.width,
+            availableSize.height / imageSize.height
+        )
+
+        return CGSize(width: imageSize.width * scale, height: imageSize.height * scale)
     }
 }
 
