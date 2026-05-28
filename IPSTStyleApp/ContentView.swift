@@ -7,294 +7,303 @@
 
 import SwiftUI
 import UIKit
-import CoreML
-import Vision
 
 struct ContentView: View {
-    @State private var selectedImage: UIImage?
+    @State private var sourceImage: UIImage?
+    @State private var targetImage: UIImage?
     @State private var stylizedImage: UIImage?
-    @State private var showPhotoLibrary = false
-    @State private var showCamera = false
-    @State private var modelLoaded = false
     @State private var isProcessing = false
     @State private var isSaving = false
-    @State private var errorMessage: String?
-    @State private var showError = false
-    @State private var showSaveSuccess = false
+    @State private var showSourceLibrary = false
+    @State private var showSourceCamera = false
+    @State private var showTargetLibrary = false
+    @State private var showTargetCamera = false
     @State private var showResultScreen = false
+    @State private var showCameraError = false
+    @State private var showError = false
+    @State private var showSaveToast = false
+    @State private var errorMessage: String?
+    @State private var pulseTransferIndicator = false
+    @State private var imageSaver: ImageSaver?
 
     @StateObject private var styleService = StyleTransferService()
 
-    var body: some View {
-        NavigationView {
-            ZStack {
-                LinearGradient(
-                    colors: [Color(hex: "1a1a2e"), Color(hex: "16213e")],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
+    private var canApplyTransfer: Bool {
+        sourceImage != nil && targetImage != nil && !isProcessing
+    }
 
-                VStack(spacing: 24) {
+    private var canSave: Bool {
+        stylizedImage != nil && !isSaving && !isProcessing
+    }
+
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [Color(hex: "111326"), Color(hex: "171b35"), Color(hex: "10121f")],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 22) {
                     headerView
-                    imageDisplayArea
-                    Spacer()
-                    actionButtons
+
+                    ImageStepView(
+                        stepLabel: "1. SOURCE IMAGE",
+                        stepColor: Color(hex: "ff3f8f"),
+                        subtitle: "Color Reference",
+                        image: sourceImage,
+                        placeholderIcon: "paintpalette.fill",
+                        onLibraryTap: { showSourceLibrary = true },
+                        onCameraTap: { openCamera(for: .source) }
+                    )
+
+                    transferIndicator
+
+                    ImageStepView(
+                        stepLabel: "2. TARGET IMAGE",
+                        stepColor: Color(hex: "a78bfa"),
+                        subtitle: "Image to Apply To",
+                        image: targetImage,
+                        placeholderIcon: "photo.fill.on.rectangle.fill",
+                        onLibraryTap: { showTargetLibrary = true },
+                        onCameraTap: { openCamera(for: .target) }
+                    )
+
+                    primaryActionButton
+                    resultSection
                     statusIndicator
                 }
-                .padding()
+                .padding(.horizontal, 18)
+                .padding(.top, 18)
+                .padding(.bottom, 24)
             }
-            .navigationBarHidden(true)
+            .safeAreaInset(edge: .top) {
+                Color.clear.frame(height: 1)
+            }
+
+            if showSaveToast {
+                SavedToast()
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 28)
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .zIndex(1)
+            }
         }
-        .navigationViewStyle(.stack)
-        .sheet(isPresented: $showPhotoLibrary) {
-            PhotoLibraryPicker(selectedImage: $selectedImage)
+        .sheet(isPresented: $showSourceLibrary) {
+            PhotoLibraryPicker(selectedImage: $sourceImage)
         }
-        .fullScreenCover(isPresented: $showCamera) {
-            CameraPicker(selectedImage: $selectedImage)
+        .sheet(isPresented: $showTargetLibrary) {
+            PhotoLibraryPicker(selectedImage: $targetImage)
+        }
+        .fullScreenCover(isPresented: $showSourceCamera) {
+            CameraPicker(selectedImage: $sourceImage)
+                .ignoresSafeArea()
+        }
+        .fullScreenCover(isPresented: $showTargetCamera) {
+            CameraPicker(selectedImage: $targetImage)
                 .ignoresSafeArea()
         }
         .fullScreenCover(isPresented: $showResultScreen) {
-            if let originalImage = selectedImage, let stylizedImage = stylizedImage {
+            if let targetImage, let stylizedImage {
                 ResultFullScreenView(
-                    originalImage: originalImage,
+                    originalImage: targetImage,
                     stylizedImage: stylizedImage,
-                    onSave: {
-                        saveToGallery()
-                        showResultScreen = false
-                    },
-                    onCancel: {
-                        showResultScreen = false
-                    }
+                    showSaveToast: $showSaveToast,
+                    onSave: saveToGallery,
+                    onCancel: { showResultScreen = false }
                 )
-            } else {
-                Color.black.ignoresSafeArea()
             }
         }
-        .onChange(of: selectedImage) { _ in
-            stylizedImage = nil
-            showResultScreen = false
+        .alert("Camera Unavailable", isPresented: $showCameraError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("Camera is not available in the simulator. Use Library instead.")
         }
         .alert("Style Transfer Error", isPresented: $showError) {
             Button("OK", role: .cancel) { }
         } message: {
             Text(errorMessage ?? "An unknown error occurred")
         }
-        .alert("Saved!", isPresented: $showSaveSuccess) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text("Your stylized photo has been saved to the gallery.")
+        .onChange(of: sourceImage) {
+            stylizedImage = nil
+        }
+        .onChange(of: targetImage) {
+            stylizedImage = nil
         }
         .onAppear {
-            verifyModel()
+            withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
+                pulseTransferIndicator = true
+            }
         }
     }
 
     private var headerView: some View {
         VStack(spacing: 8) {
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
                 Image(systemName: "wand.and.stars")
-                    .font(.system(size: 32, weight: .medium))
+                    .font(.system(size: 30, weight: .semibold))
                     .foregroundStyle(
                         LinearGradient(
-                            colors: [Color(hex: "e94560"), Color(hex: "ff6b6b")],
+                            colors: [Color(hex: "ff3f8f"), Color(hex: "a78bfa")],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
                     )
 
                 Text("IPST Style")
-                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .font(.system(size: 30, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
             }
 
-            Text("Instant Photorealistic Style Transfer")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(Color.white.opacity(0.6))
-        }
-        .padding(.top, 20)
-    }
-
-    private var imageDisplayArea: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color.white.opacity(0.05))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                )
-
-            if let originalImage = selectedImage, let stylizedImage = stylizedImage {
-                BeforeAfterComparisonView(
-                    originalImage: originalImage,
-                    stylizedImage: stylizedImage,
-                    cornerRadius: 16
-                )
-                .padding(8)
-            } else if let displayImage = selectedImage {
-                Image(uiImage: displayImage)
-                    .resizable()
-                    .scaledToFit()
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .padding(8)
-            } else if selectedImage == nil {
-                VStack(spacing: 16) {
-                    Image(systemName: "photo.on.rectangle.angled")
-                        .font(.system(size: 50, weight: .light))
-                        .foregroundColor(Color.white.opacity(0.3))
-
-                    Text("Select or capture an image")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(Color.white.opacity(0.4))
-                }
-            }
-
-            if isProcessing {
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Color.black.opacity(0.7))
-
-                VStack(spacing: 16) {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        .scaleEffect(1.5)
-
-                    Text("Applying style transfer...")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.white)
-                }
-            }
+            Text("Transfer color between images")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundColor(Color(hex: "94a3b8"))
         }
         .frame(maxWidth: .infinity)
-        .frame(height: UIScreen.main.bounds.height * 0.45)
+        .padding(.top, 8)
+        .padding(.bottom, 4)
     }
 
-    private var actionButtons: some View {
-        VStack(spacing: 12) {
-            HStack(spacing: 16) {
-                Button(action: { showPhotoLibrary = true }) {
-                    HStack(spacing: 10) {
-                        Image(systemName: "photo.stack")
-                            .font(.system(size: 18, weight: .semibold))
-                        Text("Library")
-                            .font(.system(size: 16, weight: .semibold))
-                    }
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 54)
-                    .background(
-                        LinearGradient(
-                            colors: [Color(hex: "667eea"), Color(hex: "764ba2")],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
+    private var transferIndicator: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "arrow.down.circle.fill")
+                .font(.system(size: 34, weight: .semibold))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [Color(hex: "ff3f8f"), Color(hex: "a78bfa")],
+                        startPoint: .top,
+                        endPoint: .bottom
                     )
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
-                }
+                )
+                .scaleEffect(pulseTransferIndicator ? 1.08 : 0.96)
+                .opacity(pulseTransferIndicator ? 1.0 : 0.72)
 
-                Button(action: {
-                    guard CameraPicker.isAvailable else {
-                        errorMessage = "Camera is not available in the simulator. Use Library instead."
-                        showError = true
-                        return
-                    }
-                    showCamera = true
-                }) {
-                    HStack(spacing: 10) {
-                        Image(systemName: "camera.fill")
-                            .font(.system(size: 18, weight: .semibold))
-                        Text("Camera")
-                            .font(.system(size: 16, weight: .semibold))
-                    }
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 54)
-                    .background(
-                        LinearGradient(
-                            colors: [Color(hex: "f093fb"), Color(hex: "f5576c")],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
+            Text("Transfer Color")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(Color(hex: "cbd5e1"))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 2)
+    }
+
+    private var primaryActionButton: some View {
+        VStack(spacing: 8) {
+            Button(action: applyStyleTransfer) {
+                HStack(spacing: 10) {
+                    Image(systemName: "wand.and.stars")
+                        .font(.system(size: 19, weight: .bold))
+
+                    Text(isProcessing ? "APPLYING COLOR TRANSFER" : "APPLY COLOR TRANSFER")
+                        .font(.system(size: 16, weight: .bold))
                 }
-                .disabled(!CameraPicker.isAvailable)
-                .opacity(CameraPicker.isAvailable ? 1.0 : 0.5)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 60)
+                .background(
+                    LinearGradient(
+                        colors: [Color(hex: "ff3f8f"), Color(hex: "5b21b6")],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 18))
+                .shadow(color: Color(hex: "ff3f8f").opacity(canApplyTransfer ? 0.35 : 0.0), radius: 16, x: 0, y: 8)
+            }
+            .disabled(!canApplyTransfer)
+            .opacity(canApplyTransfer ? 1.0 : 0.42)
+
+            Text("Select both images to enable")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(Color(hex: "94a3b8"))
+                .opacity(canApplyTransfer ? 0.0 : 1.0)
+                .frame(height: 18)
+        }
+    }
+
+    private var resultSection: some View {
+        HStack(spacing: 14) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Result will appear here")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(.white)
+
+                Text("You can save or share the result")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(Color(hex: "94a3b8"))
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
-            if selectedImage != nil {
-                Button(action: {
-                    applyStyleTransfer()
-                }) {
-                    HStack(spacing: 10) {
-                        Image(systemName: "wand.and.rays")
-                            .font(.system(size: 20, weight: .semibold))
-                        Text(stylizedImage != nil ? "Re apply Style" : "Apply Style Transfer")
-                            .font(.system(size: 17, weight: .bold))
-                    }
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 58)
-                    .background(
-                        LinearGradient(
-                            colors: [Color(hex: "e94560"), Color(hex: "ff6b6b")],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
-                    .shadow(color: Color(hex: "e94560").opacity(0.4), radius: 12, x: 0, y: 6)
-                }
-                .disabled(isProcessing)
-                .opacity(isProcessing ? 0.6 : 1.0)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-                .animation(.spring(response: 0.4, dampingFraction: 0.8), value: selectedImage != nil)
-            }
+            Spacer(minLength: 12)
 
-            if stylizedImage != nil {
-                Button(action: {
-                    saveToGallery()
-                }) {
-                    HStack(spacing: 10) {
-                        if isSaving {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                .scaleEffect(0.8)
-                        } else {
-                            Image(systemName: "square.and.arrow.down")
-                                .font(.system(size: 18, weight: .semibold))
-                        }
-                        Text(isSaving ? "Saving..." : "Save to Gallery")
-                            .font(.system(size: 16, weight: .semibold))
-                    }
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 54)
-                    .background(
-                        LinearGradient(
-                            colors: [Color(hex: "11998e"), Color(hex: "38ef7d")],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
-                    .shadow(color: Color(hex: "11998e").opacity(0.3), radius: 8, x: 0, y: 4)
+            Button(action: saveToGallery) {
+                HStack(spacing: 7) {
+                    Image(systemName: "square.and.arrow.down")
+                        .font(.system(size: 14, weight: .bold))
+
+                    Text(isSaving ? "Saving" : "Save")
+                        .font(.system(size: 14, weight: .bold))
                 }
-                .disabled(isSaving || isProcessing)
-                .opacity((isSaving || isProcessing) ? 0.6 : 1.0)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-                .animation(.spring(response: 0.4, dampingFraction: 0.8), value: stylizedImage != nil)
+                .foregroundColor(Color.white.opacity(canSave ? 1.0 : 0.5))
+                .padding(.horizontal, 14)
+                .frame(height: 42)
+                .background(Color.white.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
             }
+            .disabled(!canSave)
+            .opacity(canSave ? 1.0 : 0.5)
+        }
+        .padding(18)
+        .background(Color.white.opacity(0.055))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+    }
+
+    private var statusIndicator: some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(Color(hex: "22c55e"))
+                .frame(width: 8, height: 8)
+
+            Text("Model Ready")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(Color(hex: "94a3b8"))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 2)
+    }
+
+    private func openCamera(for slot: ImageSlot) {
+        guard CameraPicker.isAvailable else {
+            showCameraError = true
+            return
+        }
+
+        switch slot {
+        case .source:
+            showSourceCamera = true
+        case .target:
+            showTargetCamera = true
         }
     }
 
     private func applyStyleTransfer() {
-        guard let inputImage = selectedImage else { return }
+        guard let sourceImage, let targetImage else { return }
 
         isProcessing = true
 
         Task {
             do {
-                let result = try await styleService.applyStyle(to: inputImage)
+                let result = try await styleService.applyStyle(
+                    source: sourceImage,
+                    target: targetImage
+                )
+
                 await MainActor.run {
                     stylizedImage = result
                     isProcessing = false
@@ -311,53 +320,164 @@ struct ContentView: View {
     }
 
     private func saveToGallery() {
-        guard let imageToSave = stylizedImage else { return }
+        guard let image = stylizedImage else { return }
 
         isSaving = true
 
-        let imageSaver = ImageSaver()
-        imageSaver.onSuccess = {
+        let saver = ImageSaver()
+        imageSaver = saver
+        saver.onSuccess = {
             DispatchQueue.main.async {
-                self.isSaving = false
-                self.showSaveSuccess = true
+                isSaving = false
+                imageSaver = nil
+                showImageSavedToast()
             }
         }
-        imageSaver.onError = { error in
+        saver.onError = { error in
             DispatchQueue.main.async {
-                self.isSaving = false
-                self.errorMessage = error.localizedDescription
-                self.showError = true
+                isSaving = false
+                imageSaver = nil
+                errorMessage = error.localizedDescription
+                showError = true
             }
         }
-        imageSaver.saveImage(imageToSave)
+
+        saver.saveImage(image)
     }
 
-    private var statusIndicator: some View {
-        HStack(spacing: 8) {
-            Circle()
-                .fill(modelLoaded ? Color.green : Color.orange)
-                .frame(width: 8, height: 8)
-
-            Text(modelLoaded ? "Model Ready" : "Loading model...")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(Color.white.opacity(0.5))
+    private func showImageSavedToast() {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.9)) {
+            showSaveToast = true
         }
-        .padding(.bottom, 8)
-    }
 
-    private func verifyModel() {
-        modelLoaded = styleService.isModelLoaded
-        if modelLoaded {
-            print("✅ Model loaded successfully")
-        } else {
-            print("❌ Model is not ready")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            withAnimation(.easeOut(duration: 0.25)) {
+                showSaveToast = false
+            }
         }
     }
 }
 
-struct ResultFullScreenView: View {
+private enum ImageSlot {
+    case source
+    case target
+}
+
+private struct ImageStepView: View {
+    let stepLabel: String
+    let stepColor: Color
+    let subtitle: String
+    let image: UIImage?
+    let placeholderIcon: String
+    let onLibraryTap: () -> Void
+    let onCameraTap: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(stepLabel)
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(stepColor)
+
+                Text(subtitle)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(Color(hex: "94a3b8"))
+            }
+
+            ImageCard(image: image, placeholderIcon: placeholderIcon)
+
+            HStack(spacing: 12) {
+                GradientIconButton(
+                    title: "Library",
+                    systemImage: "photo.stack",
+                    colors: [Color(hex: "667eea"), Color(hex: "764ba2")],
+                    action: onLibraryTap
+                )
+
+                GradientIconButton(
+                    title: "Camera",
+                    systemImage: "camera.fill",
+                    colors: [Color(hex: "ff5fa2"), Color(hex: "e11d48")],
+                    action: onCameraTap
+                )
+                .opacity(CameraPicker.isAvailable ? 1.0 : 0.55)
+            }
+        }
+    }
+}
+
+private struct ImageCard: View {
+    let image: UIImage?
+    let placeholderIcon: String
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color.white.opacity(0.055))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                )
+
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 210)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .padding(8)
+            } else {
+                VStack(spacing: 12) {
+                    Image(systemName: placeholderIcon)
+                        .font(.system(size: 42, weight: .light))
+                        .foregroundColor(Color.white.opacity(0.28))
+
+                    Text("Select or capture an image")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(Color(hex: "64748b"))
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 226)
+    }
+}
+
+private struct GradientIconButton: View {
+    let title: String
+    let systemImage: String
+    let colors: [Color]
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 9) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 17, weight: .semibold))
+
+                Text(title)
+                    .font(.system(size: 15, weight: .semibold))
+            }
+            .foregroundColor(.white)
+            .frame(maxWidth: .infinity)
+            .frame(height: 52)
+            .background(
+                LinearGradient(
+                    colors: colors,
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 15))
+        }
+    }
+}
+
+private struct ResultFullScreenView: View {
     let originalImage: UIImage
     let stylizedImage: UIImage
+    @Binding var showSaveToast: Bool
     let onSave: () -> Void
     let onCancel: () -> Void
 
@@ -398,8 +518,8 @@ struct ResultFullScreenView: View {
                     stylizedImage: stylizedImage,
                     cornerRadius: 24
                 )
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
 
                 Spacer()
 
@@ -433,11 +553,20 @@ struct ResultFullScreenView: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 28)
             }
+
+            if showSaveToast {
+                SavedToast()
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 34)
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .zIndex(1)
+            }
         }
     }
 }
 
-struct BeforeAfterComparisonView: View {
+private struct BeforeAfterComparisonView: View {
     let originalImage: UIImage
     let stylizedImage: UIImage
     let cornerRadius: CGFloat
@@ -512,11 +641,11 @@ struct BeforeAfterComparisonView: View {
                         Image(systemName: "chevron.right")
                     }
                     .font(.system(size: 12, weight: .bold))
-                    .foregroundColor(Color(hex: "1a1a2e"))
+                    .foregroundColor(Color(hex: "111326"))
                 )
         }
         .accessibilityLabel("Before and after divider")
-        .accessibilityHint("Drag left or right to compare the original and stylized image")
+        .accessibilityHint("Drag left or right to compare the target and result image")
     }
 
     private func fittedImageSize(imageSize: CGSize, availableSize: CGSize) -> CGSize {
@@ -533,6 +662,46 @@ struct BeforeAfterComparisonView: View {
         )
 
         return CGSize(width: imageSize.width * scale, height: imageSize.height * scale)
+    }
+}
+
+private struct SavedToast: View {
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundColor(Color(hex: "38ef7d"))
+
+            Text("Image saved")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundColor(.white)
+        }
+        .padding(.horizontal, 16)
+        .frame(height: 48)
+        .background(Color.black.opacity(0.82))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .shadow(color: .black.opacity(0.35), radius: 14, x: 0, y: 8)
+    }
+}
+
+private class ImageSaver: NSObject {
+    var onSuccess: (() -> Void)?
+    var onError: ((Error) -> Void)?
+
+    func saveImage(_ image: UIImage) {
+        UIImageWriteToSavedPhotosAlbum(image, self, #selector(saveCompleted), nil)
+    }
+
+    @objc private func saveCompleted(_ image: UIImage, didFinishSavingWithError error: Error?, contextInfo: UnsafeRawPointer) {
+        if let error {
+            onError?(error)
+        } else {
+            onSuccess?()
+        }
     }
 }
 
@@ -559,23 +728,6 @@ extension Color {
             blue: Double(b) / 255,
             opacity: Double(a) / 255
         )
-    }
-}
-
-class ImageSaver: NSObject {
-    var onSuccess: (() -> Void)?
-    var onError: ((Error) -> Void)?
-
-    func saveImage(_ image: UIImage) {
-        UIImageWriteToSavedPhotosAlbum(image, self, #selector(saveCompleted), nil)
-    }
-
-    @objc func saveCompleted(_ image: UIImage, didFinishSavingWithError error: Error?, contextInfo: UnsafeRawPointer) {
-        if let error = error {
-            onError?(error)
-        } else {
-            onSuccess?()
-        }
     }
 }
 

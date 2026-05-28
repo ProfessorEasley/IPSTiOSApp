@@ -152,6 +152,12 @@ class StyleTransferService: ObservableObject {
 
         return applyColorCorrection(stylizedImage)
     }
+
+    func applyStyle(source: UIImage, target: UIImage) async throws -> UIImage {
+        _ = source
+        return try await applyStyle(to: target)
+    }
+
     func applyColorCorrection(_ image: UIImage) -> UIImage {
         guard let ciImage = CIImage(image: image) else { return image }
 
