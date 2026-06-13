@@ -7,10 +7,13 @@
 
 import SwiftUI
 import UIKit
+import AVKit
 
 struct ContentView: View {
     @State private var sourceImage: UIImage?
+    @State private var sourceVideoURL: URL?
     @State private var targetImage: UIImage?
+    @State private var targetVideoURL: URL?
     @State private var stylizedImage: UIImage?
     @State private var isProcessing = false
     @State private var isSaving = false
@@ -29,7 +32,9 @@ struct ContentView: View {
     @StateObject private var styleService = StyleTransferService()
 
     private var canApplyTransfer: Bool {
-        sourceImage != nil && targetImage != nil && !isProcessing
+        (sourceImage != nil || sourceVideoURL != nil)
+            && (targetImage != nil || targetVideoURL != nil)
+            && !isProcessing
     }
 
     private var canSave: Bool {
@@ -50,11 +55,14 @@ struct ContentView: View {
                     headerView
 
                     ImageStepView(
-                        stepLabel: "1. SOURCE IMAGE",
+                        stepLabel: "1. SOURCE IMAGE OR VIDEO",
                         stepColor: Color(hex: "ff3f8f"),
-                        subtitle: "Color Reference",
+                        subtitle: "Media to Style",
                         image: sourceImage,
+                        videoURL: sourceVideoURL,
                         placeholderIcon: "paintpalette.fill",
+                        placeholderText: "Choose source image or video",
+                        libraryTitle: "Choose Media",
                         onLibraryTap: { showSourceLibrary = true },
                         onCameraTap: { openCamera(for: .source) }
                     )
@@ -62,11 +70,14 @@ struct ContentView: View {
                     transferIndicator
 
                     ImageStepView(
-                        stepLabel: "2. TARGET IMAGE",
+                        stepLabel: "2. TARGET STYLE IMAGE OR VIDEO",
                         stepColor: Color(hex: "a78bfa"),
-                        subtitle: "Image to Apply To",
+                        subtitle: "Style Reference",
                         image: targetImage,
-                        placeholderIcon: "photo.fill.on.rectangle.fill",
+                        videoURL: targetVideoURL,
+                        placeholderIcon: "photo.on.rectangle.angled",
+                        placeholderText: "Choose image or video",
+                        libraryTitle: "Choose Media",
                         onLibraryTap: { showTargetLibrary = true },
                         onCameraTap: { openCamera(for: .target) }
                     )
@@ -93,10 +104,18 @@ struct ContentView: View {
             }
         }
         .sheet(isPresented: $showSourceLibrary) {
-            PhotoLibraryPicker(selectedImage: $sourceImage)
+            PhotoLibraryPicker(
+                selectedImage: $sourceImage,
+                selectedVideoURL: $sourceVideoURL,
+                mediaFilter: .imagesAndVideos
+            )
         }
         .sheet(isPresented: $showTargetLibrary) {
-            PhotoLibraryPicker(selectedImage: $targetImage)
+            PhotoLibraryPicker(
+                selectedImage: $targetImage,
+                selectedVideoURL: $targetVideoURL,
+                mediaFilter: .imagesAndVideos
+            )
         }
         .fullScreenCover(isPresented: $showSourceCamera) {
             CameraPicker(selectedImage: $sourceImage)
@@ -107,9 +126,9 @@ struct ContentView: View {
                 .ignoresSafeArea()
         }
         .fullScreenCover(isPresented: $showResultScreen) {
-            if let targetImage, let stylizedImage {
+            if let sourceImage, let stylizedImage {
                 ResultFullScreenView(
-                    originalImage: targetImage,
+                    originalImage: sourceImage,
                     stylizedImage: stylizedImage,
                     showSaveToast: $showSaveToast,
                     onSave: saveToGallery,
@@ -129,8 +148,20 @@ struct ContentView: View {
         }
         .onChange(of: sourceImage) {
             stylizedImage = nil
+            if sourceImage != nil {
+                sourceVideoURL = nil
+            }
+        }
+        .onChange(of: sourceVideoURL) {
+            stylizedImage = nil
         }
         .onChange(of: targetImage) {
+            stylizedImage = nil
+            if targetImage != nil {
+                targetVideoURL = nil
+            }
+        }
+        .onChange(of: targetVideoURL) {
             stylizedImage = nil
         }
         .onAppear {
@@ -158,7 +189,7 @@ struct ContentView: View {
                     .foregroundColor(.white)
             }
 
-            Text("Transfer color between images")
+            Text("Transfer color to images or videos")
                 .font(.system(size: 15, weight: .medium))
                 .foregroundColor(Color(hex: "94a3b8"))
         }
@@ -196,7 +227,7 @@ struct ContentView: View {
                     Image(systemName: "wand.and.stars")
                         .font(.system(size: 19, weight: .bold))
 
-                    Text(isProcessing ? "APPLYING COLOR TRANSFER" : "APPLY COLOR TRANSFER")
+                    Text(isProcessing ? "APPLYING COLOR TRANSFER" : primaryActionTitle)
                         .font(.system(size: 16, weight: .bold))
                 }
                 .foregroundColor(.white)
@@ -215,7 +246,7 @@ struct ContentView: View {
             .disabled(!canApplyTransfer)
             .opacity(canApplyTransfer ? 1.0 : 0.42)
 
-            Text("Select both images to enable")
+            Text("Select source and target media to enable")
                 .font(.system(size: 13, weight: .medium))
                 .foregroundColor(Color(hex: "94a3b8"))
                 .opacity(canApplyTransfer ? 0.0 : 1.0)
@@ -226,11 +257,11 @@ struct ContentView: View {
     private var resultSection: some View {
         HStack(spacing: 14) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("Result will appear here")
+                Text(resultTitle)
                     .font(.system(size: 16, weight: .bold))
                     .foregroundColor(.white)
 
-                Text("You can save or share the result")
+                Text(resultSubtitle)
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(Color(hex: "94a3b8"))
                     .fixedSize(horizontal: false, vertical: true)
@@ -278,6 +309,20 @@ struct ContentView: View {
         .padding(.top, 2)
     }
 
+    private var primaryActionTitle: String {
+        sourceVideoURL == nil && targetVideoURL == nil ? "APPLY COLOR TRANSFER" : "APPLY TO VIDEO"
+    }
+
+    private var resultTitle: String {
+        sourceVideoURL == nil && targetVideoURL == nil ? "Result will appear here" : "Video media selected"
+    }
+
+    private var resultSubtitle: String {
+        sourceVideoURL == nil && targetVideoURL == nil
+            ? "You can save or share the result"
+            : "Frame-by-frame video transfer still needs the video backend"
+    }
+
     private func openCamera(for slot: ImageSlot) {
         guard CameraPicker.isAvailable else {
             showCameraError = true
@@ -293,6 +338,12 @@ struct ContentView: View {
     }
 
     private func applyStyleTransfer() {
+        if sourceVideoURL != nil || targetVideoURL != nil {
+            errorMessage = "Source and target video selection is ready. To apply style to MP4s, add the AVFoundation frame-by-frame export pipeline around the Core ML model."
+            showError = true
+            return
+        }
+
         guard let sourceImage, let targetImage else { return }
 
         isProcessing = true
@@ -300,8 +351,8 @@ struct ContentView: View {
         Task {
             do {
                 let result = try await styleService.applyStyle(
-                    source: sourceImage,
-                    target: targetImage
+                    source: targetImage,
+                    target: sourceImage
                 )
 
                 await MainActor.run {
@@ -368,7 +419,10 @@ private struct ImageStepView: View {
     let stepColor: Color
     let subtitle: String
     let image: UIImage?
+    let videoURL: URL?
     let placeholderIcon: String
+    let placeholderText: String
+    let libraryTitle: String
     let onLibraryTap: () -> Void
     let onCameraTap: () -> Void
 
@@ -384,11 +438,16 @@ private struct ImageStepView: View {
                     .foregroundColor(Color(hex: "94a3b8"))
             }
 
-            ImageCard(image: image, placeholderIcon: placeholderIcon)
+            ImageCard(
+                image: image,
+                videoURL: videoURL,
+                placeholderIcon: placeholderIcon,
+                placeholderText: placeholderText
+            )
 
             HStack(spacing: 12) {
                 GradientIconButton(
-                    title: "Library",
+                    title: libraryTitle,
                     systemImage: "photo.stack",
                     colors: [Color(hex: "667eea"), Color(hex: "764ba2")],
                     action: onLibraryTap
@@ -408,7 +467,9 @@ private struct ImageStepView: View {
 
 private struct ImageCard: View {
     let image: UIImage?
+    let videoURL: URL?
     let placeholderIcon: String
+    let placeholderText: String
 
     var body: some View {
         ZStack {
@@ -427,13 +488,29 @@ private struct ImageCard: View {
                     .frame(height: 210)
                     .clipShape(RoundedRectangle(cornerRadius: 16))
                     .padding(8)
+            } else if let videoURL {
+                VideoPlayer(player: AVPlayer(url: videoURL))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 210)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .padding(8)
+                    .overlay(alignment: .topLeading) {
+                        Label("Video", systemImage: "video.fill")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 10)
+                            .frame(height: 30)
+                            .background(Color.black.opacity(0.62))
+                            .clipShape(Capsule())
+                            .padding(14)
+                    }
             } else {
                 VStack(spacing: 12) {
                     Image(systemName: placeholderIcon)
                         .font(.system(size: 42, weight: .light))
                         .foregroundColor(Color.white.opacity(0.28))
 
-                    Text("Select or capture an image")
+                    Text(placeholderText)
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(Color(hex: "64748b"))
                 }

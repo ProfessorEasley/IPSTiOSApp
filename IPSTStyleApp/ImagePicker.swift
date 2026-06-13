@@ -7,15 +7,29 @@
 
 import SwiftUI
 import PhotosUI
+import UniformTypeIdentifiers
+
+enum PhotoLibraryMediaFilter {
+    case images
+    case imagesAndVideos
+}
 
 // MARK: - Photo Library Picker (iOS 16+)
 struct PhotoLibraryPicker: UIViewControllerRepresentable {
     @Binding var selectedImage: UIImage?
+    var selectedVideoURL: Binding<URL?>?
+    var mediaFilter: PhotoLibraryMediaFilter = .images
+
     @Environment(\.dismiss) private var dismiss
     
     func makeUIViewController(context: Context) -> PHPickerViewController {
         var config = PHPickerConfiguration()
-        config.filter = .images
+        switch mediaFilter {
+        case .images:
+            config.filter = .images
+        case .imagesAndVideos:
+            config.filter = .any(of: [.images, .videos])
+        }
         config.selectionLimit = 1
         
         let picker = PHPickerViewController(configuration: config)
@@ -40,8 +54,40 @@ struct PhotoLibraryPicker: UIViewControllerRepresentable {
             parent.dismiss()
             print("Picked results count:", results.count)
             
-            guard let provider = results.first?.itemProvider,
-                  provider.canLoadObject(ofClass: UIImage.self) else {
+            guard let provider = results.first?.itemProvider else {
+                print("Could not load item provider")
+                return
+            }
+
+            if provider.hasItemConformingToTypeIdentifier(UTType.movie.identifier) {
+                provider.loadFileRepresentation(forTypeIdentifier: UTType.movie.identifier) { [weak self] url, error in
+                    if let error {
+                        print("Video load error:", error)
+                    }
+
+                    guard let url else { return }
+
+                    let fileName = "\(UUID().uuidString).\(url.pathExtension.isEmpty ? "mov" : url.pathExtension)"
+                    let destinationURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
+
+                    do {
+                        if FileManager.default.fileExists(atPath: destinationURL.path) {
+                            try FileManager.default.removeItem(at: destinationURL)
+                        }
+                        try FileManager.default.copyItem(at: url, to: destinationURL)
+
+                        DispatchQueue.main.async {
+                            self?.parent.selectedImage = nil
+                            self?.parent.selectedVideoURL?.wrappedValue = destinationURL
+                        }
+                    } catch {
+                        print("Video copy error:", error)
+                    }
+                }
+                return
+            }
+
+            guard provider.canLoadObject(ofClass: UIImage.self) else {
                 print("Could not load UIImage")
                 return
             }
@@ -53,6 +99,7 @@ struct PhotoLibraryPicker: UIViewControllerRepresentable {
                         }
                         print("Loaded image:", image as Any)
                         self?.parent.selectedImage = image as? UIImage
+                        self?.parent.selectedVideoURL?.wrappedValue = nil
                     }
                 }
         }
@@ -114,4 +161,3 @@ struct CameraPicker: UIViewControllerRepresentable {
 //        UIImagePickerController.isSourceTypeAvailable(.camera)
 //    }
 //}
-
