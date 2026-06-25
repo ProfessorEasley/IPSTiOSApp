@@ -8,15 +8,15 @@
 
 /* Begin PBXBuildFile section */
 		080766072F9BFBA800AE3C0E /* ipst_style.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = 080766062F9BFBA800AE3C0E /* ipst_style.mlpackage */; };
-		088F8A762F89A3E600D1F743 /* cameraPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 088F8A752F89A3E600D1F743 /* cameraPicker.swift */; };
+		088E71142FEDEDE000A0E547 /* CameraPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 088E71132FEDEDE000A0E547 /* CameraPicker.swift */; };
+		088E71162FEDEE0000A0E547 /* PhotoLibraryPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 088E71152FEDEE0000A0E547 /* PhotoLibraryPicker.swift */; };
+		088E711C2FEDEE5300A0E547 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 088E711B2FEDEE5300A0E547 /* ContentView.swift */; };
 		DD4ABB702EE2A15C00C04807 /* IPSTStyleAppApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD4ABB6F2EE2A15C00C04807 /* IPSTStyleAppApp.swift */; };
-		DD4ABB722EE2A15C00C04807 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD4ABB712EE2A15C00C04807 /* ContentView.swift */; };
 		DD4ABB742EE2A16000C04807 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = DD4ABB732EE2A16000C04807 /* Assets.xcassets */; };
 		DD4ABB772EE2A16000C04807 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = DD4ABB762EE2A16000C04807 /* Preview Assets.xcassets */; };
 		DD4ABB812EE2A16100C04807 /* IPSTStyleAppTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD4ABB802EE2A16100C04807 /* IPSTStyleAppTests.swift */; };
 		DD4ABB8B2EE2A16100C04807 /* IPSTStyleAppUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD4ABB8A2EE2A16100C04807 /* IPSTStyleAppUITests.swift */; };
 		DD4ABB8D2EE2A16100C04807 /* IPSTStyleAppUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD4ABB8C2EE2A16100C04807 /* IPSTStyleAppUITestsLaunchTests.swift */; };
-		DD4ABB9B2EE2A3DC00C04807 /* ImagePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD4ABB9C2EE2A3DC00C04807 /* ImagePicker.swift */; };
 		DD4ABB9E2EE2A4DC00C04807 /* StyleTransferService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD4ABB9F2EE2A4DC00C04807 /* StyleTransferService.swift */; };
 /* End PBXBuildFile section */
 
@@ -39,10 +39,11 @@
 
 /* Begin PBXFileReference section */
 		080766062F9BFBA800AE3C0E /* ipst_style.mlpackage */ = {isa = PBXFileReference; lastKnownFileType = folder.mlpackage; path = ipst_style.mlpackage; sourceTree = "<group>"; };
-		088F8A752F89A3E600D1F743 /* cameraPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = cameraPicker.swift; sourceTree = "<group>"; };
+		088E71132FEDEDE000A0E547 /* CameraPicker.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CameraPicker.swift; sourceTree = "<group>"; };
+		088E71152FEDEE0000A0E547 /* PhotoLibraryPicker.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PhotoLibraryPicker.swift; sourceTree = "<group>"; };
+		088E711B2FEDEE5300A0E547 /* ContentView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		DD4ABB6C2EE2A15C00C04807 /* IPSTStyleApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = IPSTStyleApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		DD4ABB6F2EE2A15C00C04807 /* IPSTStyleAppApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPSTStyleAppApp.swift; sourceTree = "<group>"; };
-		DD4ABB712EE2A15C00C04807 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		DD4ABB732EE2A16000C04807 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		DD4ABB762EE2A16000C04807 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		DD4ABB7C2EE2A16100C04807 /* IPSTStyleAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = IPSTStyleAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -50,7 +51,6 @@
 		DD4ABB862EE2A16100C04807 /* IPSTStyleAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = IPSTStyleAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		DD4ABB8A2EE2A16100C04807 /* IPSTStyleAppUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPSTStyleAppUITests.swift; sourceTree = "<group>"; };
 		DD4ABB8C2EE2A16100C04807 /* IPSTStyleAppUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPSTStyleAppUITestsLaunchTests.swift; sourceTree = "<group>"; };
-		DD4ABB9C2EE2A3DC00C04807 /* ImagePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImagePicker.swift; sourceTree = "<group>"; };
 		DD4ABB9D2EE2A3DC00C04807 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		DD4ABB9F2EE2A4DC00C04807 /* StyleTransferService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StyleTransferService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -84,6 +84,8 @@
 			isa = PBXGroup;
 			children = (
 				DD4ABB6E2EE2A15C00C04807 /* IPSTStyleApp */,
+				088E71132FEDEDE000A0E547 /* CameraPicker.swift */,
+				088E71152FEDEE0000A0E547 /* PhotoLibraryPicker.swift */,
 				DD4ABB7F2EE2A16100C04807 /* IPSTStyleAppTests */,
 				DD4ABB892EE2A16100C04807 /* IPSTStyleAppUITests */,
 				DD4ABB6D2EE2A15C00C04807 /* Products */,
@@ -106,12 +108,10 @@
 				080766062F9BFBA800AE3C0E /* ipst_style.mlpackage */,
 				DD4ABB9D2EE2A3DC00C04807 /* Info.plist */,
 				DD4ABB6F2EE2A15C00C04807 /* IPSTStyleAppApp.swift */,
-				DD4ABB712EE2A15C00C04807 /* ContentView.swift */,
-				DD4ABB9C2EE2A3DC00C04807 /* ImagePicker.swift */,
+				088E711B2FEDEE5300A0E547 /* ContentView.swift */,
 				DD4ABB9F2EE2A4DC00C04807 /* StyleTransferService.swift */,
 				DD4ABB732EE2A16000C04807 /* Assets.xcassets */,
 				DD4ABB752EE2A16000C04807 /* Preview Content */,
-				088F8A752F89A3E600D1F743 /* cameraPicker.swift */,
 			);
 			path = IPSTStyleApp;
 			sourceTree = "<group>";
@@ -271,11 +271,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				DD4ABB722EE2A15C00C04807 /* ContentView.swift in Sources */,
-				DD4ABB9B2EE2A3DC00C04807 /* ImagePicker.swift in Sources */,
+				088E71162FEDEE0000A0E547 /* PhotoLibraryPicker.swift in Sources */,
+				088E711C2FEDEE5300A0E547 /* ContentView.swift in Sources */,
+				088E71142FEDEDE000A0E547 /* CameraPicker.swift in Sources */,
 				DD4ABB9E2EE2A4DC00C04807 /* StyleTransferService.swift in Sources */,
 				080766072F9BFBA800AE3C0E /* ipst_style.mlpackage in Sources */,
-				088F8A762F89A3E600D1F743 /* cameraPicker.swift in Sources */,
 				DD4ABB702EE2A15C00C04807 /* IPSTStyleAppApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

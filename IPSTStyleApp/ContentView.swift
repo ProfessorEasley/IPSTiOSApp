@@ -1,9 +1,5 @@
-//
-//  ContentView.swift
-//  IPSTStyleApp
-//
-//  Created by EXPO on 12/4/25.
-//
+// ContentView.swift
+// IPSTStyleApp
 
 import SwiftUI
 import UIKit
@@ -28,6 +24,7 @@ struct ContentView: View {
     @State private var errorMessage: String?
     @State private var pulseTransferIndicator = false
     @State private var imageSaver: ImageSaver?
+    @State private var stylizedVideoURL: URL?
 
     @StateObject private var styleService = StyleTransferService()
 
@@ -66,8 +63,6 @@ struct ContentView: View {
                         onLibraryTap: { showSourceLibrary = true },
                         onCameraTap: { openCamera(for: .source) }
                     )
-
-                    transferIndicator
 
                     ImageStepView(
                         stepLabel: "2. TARGET STYLE IMAGE OR VIDEO",
@@ -126,14 +121,17 @@ struct ContentView: View {
                 .ignoresSafeArea()
         }
         .fullScreenCover(isPresented: $showResultScreen) {
-            if let sourceImage, let stylizedImage {
+            if let stylizedImage {
                 ResultFullScreenView(
-                    originalImage: sourceImage,
+                    originalImage: sourceImage ?? UIImage(),
                     stylizedImage: stylizedImage,
                     showSaveToast: $showSaveToast,
                     onSave: saveToGallery,
                     onCancel: { showResultScreen = false }
                 )
+            } else if let stylizedVideoURL {
+                VideoPlayer(player: AVPlayer(url: stylizedVideoURL))
+                    .edgesIgnoringSafeArea(.all)
             }
         }
         .alert("Camera Unavailable", isPresented: $showCameraError) {
@@ -148,18 +146,14 @@ struct ContentView: View {
         }
         .onChange(of: sourceImage) {
             stylizedImage = nil
-            if sourceImage != nil {
-                sourceVideoURL = nil
-            }
+            if sourceImage != nil { sourceVideoURL = nil }
         }
         .onChange(of: sourceVideoURL) {
             stylizedImage = nil
         }
         .onChange(of: targetImage) {
             stylizedImage = nil
-            if targetImage != nil {
-                targetVideoURL = nil
-            }
+            if targetImage != nil { targetVideoURL = nil }
         }
         .onChange(of: targetVideoURL) {
             stylizedImage = nil
@@ -170,6 +164,8 @@ struct ContentView: View {
             }
         }
     }
+
+    // MARK: - Header
 
     private var headerView: some View {
         VStack(spacing: 8) {
@@ -183,12 +179,10 @@ struct ContentView: View {
                             endPoint: .bottomTrailing
                         )
                     )
-
                 Text("IPST Style")
                     .font(.system(size: 30, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
             }
-
             Text("Transfer color to images or videos")
                 .font(.system(size: 15, weight: .medium))
                 .foregroundColor(Color(hex: "94a3b8"))
@@ -198,36 +192,21 @@ struct ContentView: View {
         .padding(.bottom, 4)
     }
 
-    private var transferIndicator: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "arrow.down.circle.fill")
-                .font(.system(size: 34, weight: .semibold))
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [Color(hex: "ff3f8f"), Color(hex: "a78bfa")],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .scaleEffect(pulseTransferIndicator ? 1.08 : 0.96)
-                .opacity(pulseTransferIndicator ? 1.0 : 0.72)
-
-            Text("Transfer Color")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(Color(hex: "cbd5e1"))
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 2)
-    }
+    // MARK: - Action Button
 
     private var primaryActionButton: some View {
         VStack(spacing: 8) {
             Button(action: applyStyleTransfer) {
                 HStack(spacing: 10) {
-                    Image(systemName: "wand.and.stars")
-                        .font(.system(size: 19, weight: .bold))
-
-                    Text(isProcessing ? "APPLYING COLOR TRANSFER" : primaryActionTitle)
+                    if isProcessing {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .scaleEffect(0.85)
+                    } else {
+                        Image(systemName: "wand.and.stars")
+                            .font(.system(size: 19, weight: .bold))
+                    }
+                    Text(isProcessing ? "APPLYING COLOR TRANSFER..." : primaryActionTitle)
                         .font(.system(size: 16, weight: .bold))
                 }
                 .foregroundColor(.white)
@@ -254,30 +233,26 @@ struct ContentView: View {
         }
     }
 
+    // MARK: - Result Section
+
     private var resultSection: some View {
         HStack(spacing: 14) {
             VStack(alignment: .leading, spacing: 6) {
                 Text(resultTitle)
                     .font(.system(size: 16, weight: .bold))
                     .foregroundColor(.white)
-
                 Text(resultSubtitle)
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(Color(hex: "94a3b8"))
                     .fixedSize(horizontal: false, vertical: true)
             }
-
             Spacer(minLength: 12)
-
             Button(action: saveToGallery) {
                 HStack(spacing: 7) {
                     Image(systemName: "square.and.arrow.down")
-                        .font(.system(size: 14, weight: .bold))
-
-                    Text(isSaving ? "Saving" : "Save")
-                        .font(.system(size: 14, weight: .bold))
+                    Text("Save")
                 }
-                .foregroundColor(Color.white.opacity(canSave ? 1.0 : 0.5))
+                .foregroundColor(.white)
                 .padding(.horizontal, 14)
                 .frame(height: 42)
                 .background(Color.white.opacity(0.08))
@@ -300,7 +275,6 @@ struct ContentView: View {
             Circle()
                 .fill(Color(hex: "22c55e"))
                 .frame(width: 8, height: 8)
-
             Text("Model Ready")
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(Color(hex: "94a3b8"))
@@ -310,56 +284,74 @@ struct ContentView: View {
     }
 
     private var primaryActionTitle: String {
-        sourceVideoURL == nil && targetVideoURL == nil ? "APPLY COLOR TRANSFER" : "APPLY TO VIDEO"
+        sourceVideoURL != nil ? "APPLY TO VIDEO" : "APPLY COLOR TRANSFER"
     }
 
     private var resultTitle: String {
-        sourceVideoURL == nil && targetVideoURL == nil ? "Result will appear here" : "Video media selected"
+        sourceVideoURL != nil ? "Video media selected" : "Result will appear here"
     }
 
     private var resultSubtitle: String {
-        sourceVideoURL == nil && targetVideoURL == nil
-            ? "You can save or share the result"
-            : "Frame-by-frame video transfer still needs the video backend"
+        if sourceVideoURL != nil {
+            return stylizedVideoURL != nil ? "Video style transfer complete" : "Processing video..."
+        }
+        return "You can save or share the result"
     }
+
+    // MARK: - Camera
 
     private func openCamera(for slot: ImageSlot) {
         guard CameraPicker.isAvailable else {
             showCameraError = true
             return
         }
-
         switch slot {
-        case .source:
-            showSourceCamera = true
-        case .target:
-            showTargetCamera = true
+        case .source: showSourceCamera = true
+        case .target: showTargetCamera = true
         }
     }
 
+    // MARK: - Apply Style Transfer
+
     private func applyStyleTransfer() {
-        if sourceVideoURL != nil || targetVideoURL != nil {
-            errorMessage = "Source and target video selection is ready. To apply style to MP4s, add the AVFoundation frame-by-frame export pipeline around the Core ML model."
-            showError = true
-            return
-        }
-
-        guard let sourceImage, let targetImage else { return }
-
         isProcessing = true
 
         Task {
             do {
-                let result = try await styleService.applyStyle(
-                    source: targetImage,
-                    target: sourceImage
-                )
+                // VIDEO MODE
+                if let sourceVideoURL = sourceVideoURL {
+                    guard let styleImage = targetImage else {
+                        await MainActor.run { isProcessing = false }
+                        return
+                    }
+                    let frames = try await extractFrames(from: sourceVideoURL)
+                    let styledFrames = try await styleFrames(frames, styleImage: styleImage, styleService: styleService)
+                    let videoURL = try await exportVideo(from: styledFrames)
+
+                    await MainActor.run {
+                        stylizedVideoURL = videoURL
+                        stylizedImage = nil
+                        isProcessing = false
+                        showResultScreen = true
+                    }
+                    return
+                }
+
+                // IMAGE MODE
+                guard let sourceImage = sourceImage, let targetImage = targetImage else {
+                    await MainActor.run { isProcessing = false }
+                    return
+                }
+
+                let result = try await styleService.applyStyle(source: targetImage, target: sourceImage)
 
                 await MainActor.run {
                     stylizedImage = result
+                    stylizedVideoURL = nil
                     isProcessing = false
                     showResultScreen = true
                 }
+
             } catch {
                 await MainActor.run {
                     errorMessage = error.localizedDescription
@@ -370,44 +362,198 @@ struct ContentView: View {
         }
     }
 
+    // MARK: - Save
+
     private func saveToGallery() {
-        guard let image = stylizedImage else { return }
-
-        isSaving = true
-
-        let saver = ImageSaver()
-        imageSaver = saver
-        saver.onSuccess = {
-            DispatchQueue.main.async {
-                isSaving = false
-                imageSaver = nil
-                showImageSavedToast()
+        if let image = stylizedImage {
+            isSaving = true
+            let saver = ImageSaver()
+            imageSaver = saver
+            saver.onSuccess = {
+                DispatchQueue.main.async {
+                    self.isSaving = false
+                    self.imageSaver = nil
+                    self.showImageSavedToast()
+                }
             }
-        }
-        saver.onError = { error in
-            DispatchQueue.main.async {
-                isSaving = false
-                imageSaver = nil
-                errorMessage = error.localizedDescription
-                showError = true
+            saver.onError = { error in
+                DispatchQueue.main.async {
+                    self.isSaving = false
+                    self.imageSaver = nil
+                    self.errorMessage = error.localizedDescription
+                    self.showError = true
+                }
             }
+            saver.saveImage(image)
+            return
         }
 
-        saver.saveImage(image)
+        if let videoURL = stylizedVideoURL {
+            UISaveVideoAtPathToSavedPhotosAlbum(videoURL.path, nil, nil, nil)
+            showImageSavedToast()
+        }
     }
 
     private func showImageSavedToast() {
         withAnimation(.spring(response: 0.35, dampingFraction: 0.9)) {
             showSaveToast = true
         }
-
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
             withAnimation(.easeOut(duration: 0.25)) {
-                showSaveToast = false
+                self.showSaveToast = false
             }
         }
     }
 }
+
+// MARK: - Video Pipeline
+
+import AVFoundation
+
+func extractFrames(from url: URL) async throws -> [UIImage] {
+    let asset = AVAsset(url: url)
+    let reader = try AVAssetReader(asset: asset)
+
+    guard let track = try await asset.loadTracks(withMediaType: .video).first else {
+        return []
+    }
+
+    let output = AVAssetReaderTrackOutput(
+        track: track,
+        outputSettings: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
+    )
+    reader.add(output)
+    reader.startReading()
+
+    var frames: [UIImage] = []
+    while let sampleBuffer = output.copyNextSampleBuffer(),
+          let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) {
+        let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
+        let context = CIContext()
+        if let cgImage = context.createCGImage(ciImage, from: ciImage.extent) {
+            frames.append(UIImage(cgImage: cgImage))
+        }
+    }
+    return frames
+}
+
+func styleFrames(
+    _ frames: [UIImage],
+    styleImage: UIImage,
+    styleService: StyleTransferService
+) async throws -> [UIImage] {
+    var output: [UIImage] = []
+    for frame in frames {
+        let styled = try await styleService.applyStyle(source: styleImage, target: frame)
+        output.append(styled)
+    }
+    return output
+}
+
+func exportVideo(from frames: [UIImage], fps: Int32 = 30) async throws -> URL {
+    guard let firstFrame = frames.first else {
+        throw NSError(domain: "VideoExport", code: 0,
+                      userInfo: [NSLocalizedDescriptionKey: "No frames to export"])
+    }
+
+    let outputURL = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString + ".mp4")
+    try? FileManager.default.removeItem(at: outputURL)
+
+    let width  = Int(firstFrame.size.width)
+    let height = Int(firstFrame.size.height)
+
+    let writer = try AVAssetWriter(outputURL: outputURL, fileType: .mp4)
+    let videoSettings: [String: Any] = [
+        AVVideoCodecKey:  AVVideoCodecType.h264,
+        AVVideoWidthKey:  width,
+        AVVideoHeightKey: height
+    ]
+    let input = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
+    input.expectsMediaDataInRealTime = false
+
+    let adaptor = AVAssetWriterInputPixelBufferAdaptor(
+        assetWriterInput: input,
+        sourcePixelBufferAttributes: [
+            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32ARGB,
+            kCVPixelBufferWidthKey  as String: width,
+            kCVPixelBufferHeightKey as String: height
+        ]
+    )
+
+    writer.add(input)
+    writer.startWriting()
+    writer.startSession(atSourceTime: .zero)
+
+    try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+        let queue = DispatchQueue(label: "video.export.queue")
+        var frameIndex = 0
+
+        input.requestMediaDataWhenReady(on: queue) {
+            while frameIndex < frames.count {
+                guard input.isReadyForMoreMediaData else { return }
+                let frame = frames[frameIndex]
+                let time = CMTime(value: CMTimeValue(frameIndex), timescale: fps)
+                if let buffer = makePixelBuffer(from: frame, width: width, height: height) {
+                    adaptor.append(buffer, withPresentationTime: time)
+                }
+                frameIndex += 1
+            }
+            input.markAsFinished()
+            writer.finishWriting {
+                if writer.status == .completed {
+                    continuation.resume()
+                } else {
+                    continuation.resume(throwing: writer.error ??
+                        NSError(domain: "VideoExport", code: 1,
+                                userInfo: [NSLocalizedDescriptionKey: "Unknown export error"]))
+                }
+            }
+        }
+    }
+
+    return outputURL
+}
+
+func makePixelBuffer(from image: UIImage, width: Int, height: Int) -> CVPixelBuffer? {
+    let attrs: [CFString: Any] = [
+        kCVPixelBufferCGImageCompatibilityKey:        true,
+        kCVPixelBufferCGBitmapContextCompatibilityKey: true,
+        kCVPixelBufferWidthKey:  width,
+        kCVPixelBufferHeightKey: height
+    ]
+
+    var buffer: CVPixelBuffer?
+    let status = CVPixelBufferCreate(
+        kCFAllocatorDefault, width, height,
+        kCVPixelFormatType_32ARGB,
+        attrs as CFDictionary,
+        &buffer
+    )
+    guard status == kCVReturnSuccess, let pb = buffer else { return nil }
+
+    CVPixelBufferLockBaseAddress(pb, [])
+    defer { CVPixelBufferUnlockBaseAddress(pb, []) }
+
+    guard let baseAddress = CVPixelBufferGetBaseAddress(pb) else { return nil }
+    let bytesPerRow = CVPixelBufferGetBytesPerRow(pb)
+
+    let colorSpace = CGColorSpaceCreateDeviceRGB()
+    guard let context = CGContext(
+        data: baseAddress,
+        width: width, height: height,
+        bitsPerComponent: 8,
+        bytesPerRow: bytesPerRow,
+        space: colorSpace,
+        bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Big.rawValue
+    ) else { return nil }
+
+    guard let cgImage = image.cgImage else { return nil }
+    context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+    return pb
+}
+
+// MARK: - Supporting Types
 
 private enum ImageSlot {
     case source
@@ -432,19 +578,16 @@ private struct ImageStepView: View {
                 Text(stepLabel)
                     .font(.system(size: 13, weight: .bold))
                     .foregroundColor(stepColor)
-
                 Text(subtitle)
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(Color(hex: "94a3b8"))
             }
-
             ImageCard(
                 image: image,
                 videoURL: videoURL,
                 placeholderIcon: placeholderIcon,
                 placeholderText: placeholderText
             )
-
             HStack(spacing: 12) {
                 GradientIconButton(
                     title: libraryTitle,
@@ -452,7 +595,6 @@ private struct ImageStepView: View {
                     colors: [Color(hex: "667eea"), Color(hex: "764ba2")],
                     action: onLibraryTap
                 )
-
                 GradientIconButton(
                     title: "Camera",
                     systemImage: "camera.fill",
@@ -479,7 +621,6 @@ private struct ImageCard: View {
                     RoundedRectangle(cornerRadius: 20)
                         .stroke(Color.white.opacity(0.1), lineWidth: 1)
                 )
-
             if let image {
                 Image(uiImage: image)
                     .resizable()
@@ -509,7 +650,6 @@ private struct ImageCard: View {
                     Image(systemName: placeholderIcon)
                         .font(.system(size: 42, weight: .light))
                         .foregroundColor(Color.white.opacity(0.28))
-
                     Text(placeholderText)
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(Color(hex: "64748b"))
@@ -532,7 +672,6 @@ private struct GradientIconButton: View {
             HStack(spacing: 9) {
                 Image(systemName: systemImage)
                     .font(.system(size: 17, weight: .semibold))
-
                 Text(title)
                     .font(.system(size: 15, weight: .semibold))
             }
@@ -540,11 +679,7 @@ private struct GradientIconButton: View {
             .frame(maxWidth: .infinity)
             .frame(height: 52)
             .background(
-                LinearGradient(
-                    colors: colors,
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
+                LinearGradient(colors: colors, startPoint: .leading, endPoint: .trailing)
             )
             .clipShape(RoundedRectangle(cornerRadius: 15))
         }
@@ -561,7 +696,6 @@ private struct ResultFullScreenView: View {
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-
             VStack(spacing: 20) {
                 HStack {
                     Button(action: onCancel) {
@@ -573,17 +707,12 @@ private struct ResultFullScreenView: View {
                             .background(Color.white.opacity(0.15))
                             .clipShape(Capsule())
                     }
-
                     Spacer()
-
                     Text("Preview")
                         .font(.system(size: 18, weight: .bold))
                         .foregroundColor(.white)
-
                     Spacer()
-
-                    Color.clear
-                        .frame(width: 72, height: 36)
+                    Color.clear.frame(width: 72, height: 36)
                 }
                 .padding(.horizontal)
                 .padding(.top, 8)
@@ -610,7 +739,6 @@ private struct ResultFullScreenView: View {
                             .background(Color.white.opacity(0.12))
                             .clipShape(RoundedRectangle(cornerRadius: 14))
                     }
-
                     Button(action: onSave) {
                         Text("Save")
                             .font(.system(size: 16, weight: .bold))
@@ -647,16 +775,11 @@ private struct BeforeAfterComparisonView: View {
     let originalImage: UIImage
     let stylizedImage: UIImage
     let cornerRadius: CGFloat
-
     @State private var dividerPosition: CGFloat = 0.5
 
     var body: some View {
         GeometryReader { geometry in
-            let fittedSize = fittedImageSize(
-                imageSize: originalImage.size,
-                availableSize: geometry.size
-            )
-
+            let fittedSize = fittedImageSize(imageSize: originalImage.size, availableSize: geometry.size)
             ZStack {
                 if fittedSize.width > 0 && fittedSize.height > 0 {
                     comparisonImage(size: fittedSize)
@@ -668,24 +791,20 @@ private struct BeforeAfterComparisonView: View {
 
     private func comparisonImage(size: CGSize) -> some View {
         let dividerX = size.width * dividerPosition
-
         return ZStack(alignment: .leading) {
             Image(uiImage: stylizedImage)
                 .resizable()
                 .scaledToFill()
                 .frame(width: size.width, height: size.height)
                 .clipped()
-
             Image(uiImage: originalImage)
                 .resizable()
                 .scaledToFill()
                 .frame(width: size.width, height: size.height)
                 .clipped()
                 .mask(alignment: .leading) {
-                    Rectangle()
-                        .frame(width: dividerX, height: size.height)
+                    Rectangle().frame(width: dividerX, height: size.height)
                 }
-
             divider(height: size.height)
                 .position(x: dividerX, y: size.height / 2)
         }
@@ -707,7 +826,6 @@ private struct BeforeAfterComparisonView: View {
                 .fill(Color.white)
                 .frame(width: 3, height: height)
                 .shadow(color: .black.opacity(0.35), radius: 6, x: 0, y: 0)
-
             Circle()
                 .fill(Color.white)
                 .frame(width: 42, height: 42)
@@ -721,23 +839,12 @@ private struct BeforeAfterComparisonView: View {
                     .foregroundColor(Color(hex: "111326"))
                 )
         }
-        .accessibilityLabel("Before and after divider")
-        .accessibilityHint("Drag left or right to compare the target and result image")
     }
 
     private func fittedImageSize(imageSize: CGSize, availableSize: CGSize) -> CGSize {
-        guard imageSize.width > 0,
-              imageSize.height > 0,
-              availableSize.width > 0,
-              availableSize.height > 0 else {
-            return .zero
-        }
-
-        let scale = min(
-            availableSize.width / imageSize.width,
-            availableSize.height / imageSize.height
-        )
-
+        guard imageSize.width > 0, imageSize.height > 0,
+              availableSize.width > 0, availableSize.height > 0 else { return .zero }
+        let scale = min(availableSize.width / imageSize.width, availableSize.height / imageSize.height)
         return CGSize(width: imageSize.width * scale, height: imageSize.height * scale)
     }
 }
@@ -748,7 +855,6 @@ private struct SavedToast: View {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundColor(Color(hex: "38ef7d"))
-
             Text("Image saved")
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundColor(.white)
@@ -789,22 +895,16 @@ extension Color {
         Scanner(string: hex).scanHexInt64(&int)
         let a, r, g, b: UInt64
         switch hex.count {
-        case 3:
-            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
-        case 6:
-            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
-        case 8:
-            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
-        default:
-            (a, r, g, b) = (255, 0, 0, 0)
+        case 3:  (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
+        case 6:  (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
+        case 8:  (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        default: (a, r, g, b) = (255, 0, 0, 0)
         }
-        self.init(
-            .sRGB,
-            red: Double(r) / 255,
-            green: Double(g) / 255,
-            blue: Double(b) / 255,
-            opacity: Double(a) / 255
-        )
+        self.init(.sRGB,
+                  red:     Double(r) / 255,
+                  green:   Double(g) / 255,
+                  blue:    Double(b) / 255,
+                  opacity: Double(a) / 255)
     }
 }
 
